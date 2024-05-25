@@ -1,0 +1,25 @@
+
+#TOC::before {
+  content: "";
+  display: block;
+  height: 130px;
+  width: auto;
+  margin-top: 15px;
+  margin-bottom: 15px;
+  background-image: url("../images/logo.png");
+  background-size: contain;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+
+table {
+    width: 50%;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 0;
+}

@@ -1,0 +1,22 @@
+Check info in 3 different stations
+Use nearest weather station info as helper to analysis
+Use check different params in the pollution data 
+
+
+STATIONS MAP: https://www.dati.lombardia.it/stories/s/auv9-c2sj
+
+
+The most important variables in this analysis would typically be the airborne pollutant concentrations, as they have direct implications for public health and air quality. Among these pollutants, some of the most significant ones include:
+
+1. PM10 and PM2.5: Particulate matter (PM) is a mixture of solid particles and liquid droplets suspended in the air. PM10 and PM2.5 refer to particles with diameters equal to or smaller than 10 micrometers and 2.5 micrometers, respectively. These particles can penetrate deep into the lungs and cause various health problems, including respiratory issues, cardiovascular disease, and premature death.
+2. NO2 and NOx: Nitrogen dioxide (NO2) and nitrogen oxides (NOx) are gases formed from the burning of fuels, such as coal, oil, gas, and vehicle emissions. Exposure to high levels of NO2 and NOx can lead to respiratory problems, particularly in vulnerable populations like children and the elderly.
+3. Ozone (O3): Ground-level ozone is formed by the reaction of volatile organic compounds (VOCs) and nitrogen oxides (NOx) in the presence of sunlight. High ozone levels can cause respiratory issues, aggravate asthma, and reduce lung function.
+
+Regarding correlated variables, meteorological factors often play a crucial role in determining air quality. Some key meteorological variables that can be correlated with air pollutant concentrations include:
+
+1. Temperature: Higher temperatures can increase the formation of certain pollutants, such as ozone, and can also affect the dispersion of air pollutants.
+2. Wind speed and direction: Wind can influence the transport and dispersion of air pollutants, with stronger winds often leading to better dispersion and lower pollution levels.
+3. Relative humidity: Humidity can affect the chemical reactions that form secondary pollutants, like PM2.5 and ozone, and can also influence the deposition and removal of air pollutants.
+4. Rainfall: Precipitation can help remove air pollutants from the atmosphere through wet deposition, leading to temporary improvements in air quality.
+
+By analyzing the relationships between these air pollutants and meteorological variables, you can gain valuable insights into the factors driving air quality in Lombardia and develop targeted strategies to improve public health and environmental conditions.
