@@ -20,13 +20,16 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(include=TRUE)
-knitr::opts_chunk$set(echo=FALSE)
-knitr::opts_chunk$set(fig.align='center')
+knitr::opts_chunk$set(include = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(fig.align = "center")
+options(digits = 4)
 ```
 
 ```{r environment setup, include=FALSE}
-rm(list=ls())
+rm(list = ls())
 Sys.setlocale("LC_TIME", "en_US.UTF-8")
 ```
 
@@ -36,126 +39,255 @@ This project aims to evaluate the air quality in Lombardia, Italy, using a compr
 
 The primary focus is to underscore the significance of air quality on public health. By analyzing the trends and patterns in air quality data over time, it's possible to identify periods of high pollution and correlate these with potential health risks. This analysis will provide valuable insights into how air quality fluctuations may impact the respiratory health of the region's inhabitants.
 
+In particular, the following pollutants will be analized across three different stations in Lombardia placed in different areas of the region:
 
-# Prerequirements
-```{r results='hide', message=FALSE, warning=FALSE}
+Benzene
+**Benzene** is a volatile organic compound (VOC) commonly used in the production of plastics, resins, and synthetic fibers, as well as in gasoline. It is released into the air through emissions from motor vehicles, industrial processes, and the evaporation of benzene-containing products. Exposure to benzene primarily occurs through inhalation and can lead to serious health effects, including bone marrow damage, which can cause blood disorders such as anemia and increase the risk of leukemia, a type of cancer.
+
+Carbon Monoxide (CO)
+**Carbon Monoxide (CO)** is a colorless, odorless gas produced by incomplete combustion of carbon-containing fuels, such as gasoline, natural gas, oil, and wood. Major sources include motor vehicles, industrial processes, and residential heating systems. CO interferes with the body's ability to transport oxygen by binding to hemoglobin in the blood, forming carboxyhemoglobin. High levels of exposure can lead to symptoms such as headaches, dizziness, and even death due to oxygen deprivation.
+
+Nitrogen Dioxide (NO₂)
+**Nitrogen Dioxide (NO₂)** is a reddish-brown gas with a sharp, biting odor. It is a significant air pollutant formed primarily from the combustion of fossil fuels in vehicles, power plants, and industrial processes. NO₂ can irritate the respiratory system, exacerbate asthma, and reduce lung function. It also contributes to the formation of ground-level ozone and fine particulate matter, which can have further adverse effects on human health and the environment.
+
+Nitrogen Oxides (NOₓ)
+**Nitrogen Oxides (NOₓ)** encompass a group of gases, including nitrogen dioxide (NO₂) and nitrogen monoxide (NO), produced during combustion processes, particularly at high temperatures. Major sources include motor vehicles, power plants, and industrial facilities. NOₓ gases can cause respiratory problems, contribute to the formation of smog and acid rain, and lead to the secondary formation of fine particulate matter (PM2.5), all of which can have severe health and environmental impacts.
+
+Particulate Matter 10 (PM10)
+**Particulate Matter 10 (PM10)** refers to airborne particles with a diameter of 10 micrometers or less. These particles can originate from a variety of sources, including construction sites, road dust, industrial emissions, and combustion processes. PM10 can be inhaled into the respiratory system, leading to health issues such as respiratory infections, lung inflammation, and aggravation of existing heart and lung diseases. Long-term exposure can decrease lung function and increase mortality from cardiovascular and respiratory diseases.
+
+
+```{r}
+# Pre-requirements
+
 set.seed(123) # set pseudorandom generator for reprocucibility
-
-# Load all the packages and install them if they are not present
-#default_colors <- palette.colors()[2:length(palette.colors())] #exclude black color
-requirements <- c("ARPALData", "xts", "forecast", "TSA")
-
+requirements <- c("dplyr", "ggplot2", "kableExtra", "ARPALData", "xts", "forecast", "TSA")
 for (library_name in requirements) {
-  if (!require(library_name, character.only = TRUE)) {
+  if (!require(library_name, character.only = TRUE, exclude = if (library_name == "dplyr") c("lag", "filter") else NULL)) {
     install.packages(library_name, repos = "https://cloud.r-project.org")
-    library(library_name, character.only = TRUE)
+    library(library_name, character.only = TRUE, exclude = if (library_name == "dplyr") c("lag", "filter") else NULL)
   }
 }
+lag_dplyr <- dplyr::lag
+filter_dplyr <- dplyr::filter
 
 # Import user defined functions
 source("utils.R")
+source("plotting.R")
 
 # library(styler)
 # style_file("analysis_report.Rmd")
 ```
 
+```{r}
 # Data retrieval
-```{r results='hide', message=FALSE, warning=FALSE}
-start_date <- "2004-01-01"
+
+start_date <- "2014-01-01"
 end_date <- "2023-12-31"
 # Milano v.Senato, Bormio v.Monte Braulio, Schivenoglia v. Malpasso
 aq_station_ids <- c(548, 571, 703)
+station_colors <- c("#53b400", "#00c094", "#00b6eb")
+# pollutant : unit of measure mapping
+pollutant_units <- list(
+  "Benzene" = "µg/m³",
+  "CO" = "mg/m³",
+  "NO2" = "µg/m³",
+  "NOx" = "µg/m³",
+  "PM10" = "µg/m³"
+)
 
 df_aq_daily <- NULL
-df_w_daily <- NULL
-#df_aq_monthly <- NULL
-#df_w_monthly <- NULL
-#df_aq_yearly <- NULL
-#df_w_yearly <- NULL
 df_aq_stations <- NULL
-df_w_stations <- NULL
 
-if(length(list.files("data/")) == 0) {
+if (length(list.files("data/")) == 0) {
   # Air quality data
-  df_aq_daily<-get_ARPA_Lombardia_AQ_data(ID_station=aq_station_ids, Date_begin = start_date,
-                                          Date_end = end_date, Frequency="daily", parallel = TRUE)
-  #df_aq_monthly<-get_ARPA_Lombardia_AQ_data(ID_station=aq_station_ids, Date_begin = start_date,
-  #                                        Date_end = end_date, Frequency="monthly", parallel = TRUE)
-  #df_aq_yearly<-get_ARPA_Lombardia_AQ_data(ID_station=aq_station_ids, Date_begin = start_date,
-  #                                       Date_end = end_date, Frequency="yearly", parallel = TRUE)
+  df_aq_daily <- get_ARPA_Lombardia_AQ_data(
+    ID_station = aq_station_ids, Date_begin = start_date,
+    Date_end = end_date, Frequency = "daily", parallel = TRUE
+  )
   # Station data
-  df_aq_stations<-get_ARPA_Lombardia_AQ_registry()
-  df_aq_stations<-df_aq_stations[df_aq_stations$IDStation %in% aq_station_ids,]
-  df_w_stations<-get_ARPA_Lombardia_W_registry()
-  knn_res <- registry_KNN_dist(df_aq_stations, df_w_stations, k=1)
-  df_w_stations<-df_w_stations[df_w_stations$IDStation %in% knn_res[[1]]$reg_Y_nn1_ID,]
-  
+  df_aq_stations <- get_ARPA_Lombardia_AQ_registry()
+  # Filter the stations
+  df_aq_stations <- df_aq_stations[df_aq_stations$IDStation %in% aq_station_ids, ]
   # Save data
   saveRDS(df_aq_daily, "data/df_aq_daily.rds")
-  #saveRDS(df_aq_monthly, "data/df_aq_monthly.rds")
-  #saveRDS(df_aq_yearly, "data/df_aq_yearly.rds")
   saveRDS(df_aq_stations, "data/df_aq_stations.rds")
-  saveRDS(df_w_stations, "data/df_w_stations.rds")
-  saveRDS(knn_res, "data/knn_res.rds")
-  
-  #TODO download from here
-  w_station_ids <- unique(df_w_stations$IDStation)
-  df_w_daily<-get_ARPA_Lombardia_W_data(ID_station=w_station_ids, Date_begin = start_date,
-                                        Date_end = end_date, Frequency="daily", parallel = TRUE)
-  #df_w_monthly<-get_ARPA_Lombardia_W_data(ID_station=w_station_ids, Date_begin = start_date,
-  #                                        Date_end = end_date, Frequency="monthly", parallel = TRUE)
-  #df_w_yearly<-get_ARPA_Lombardia_W_data(ID_station=w_station_ids, Date_begin = start_date,
-  #                                       Date_end = end_date, Frequency="yearly", parallel = TRUE)
-  
-  # Save data
-  saveRDS(df_w_daily, "data/df_w_daily.rds")
-  #saveRDS(df_w_monthly, "data/df_w_monthly.rds")
-  #saveRDS(df_w_yearly, "data/df_w_yearly.rds")
-  
-}else{
+} else {
   df_aq_daily <- readRDS("data/df_aq_daily.rds")
-  df_w_daily <- readRDS("data/df_w_daily.rds")
-  #df_aq_monthly <- readRDS("data/df_aq_monthly.rds")
-  #df_w_monthly <- readRDS("data/df_w_monthly.rds")
-  #df_aq_yearly <- readRDS("data/df_aq_yearly.rds")
-  #df_w_yearly <- readRDS("data/df_w_yearly.rds")
   df_aq_stations <- readRDS("data/df_aq_stations.rds")
-  df_w_stations <- readRDS("data/df_w_stations.rds")
 }
 ```
 
-```{r results='hide', message=FALSE, warning=FALSE}
+
+start_date <- "2014-01-01"
+end_date <- "2023-12-31"
+Milano v.Senato, Bormio v.Monte Braulio, Schivenoglia v. Malpasso
+aq_station_ids <- c(548, 571, 703)
+
+The stations measures different pollutants and where the columns in the dataset are all `NA` this means that the station have no sensors for measuring that pollutant in the air 
+
+# Exploratory Data Analysis
+
+## Raw data
+
+```{r echo=FALSE,out.width="49%", out.height="20%", fig.cap="caption", fig.show='hold'}
+knitr::include_graphics(c("assets/images/zoning.png", "assets/images/stations_map.png"))
+``` 
+
+```{r}
+# plot_zoning_map(
+#  title = "ARPA Lombardia zoning",
+#  line_type = 1,
+#  line_size = 1,
+#  xlab = "Longitude",
+#  ylab = "Latitude"
+# )
+# plot_AQ_stations(data_aq = df_aq_stations, title = "Map of ARPA stations in Lombardy", col_points = station_colors)
 ```
 
 ```{r}
-# check_missing_dates(df_aq_daily, start_date, end_date, "day")
-# check_missing_dates(df_w_daily, start_date, end_date, "day")
-# check_missing_dates(df_aq_monthly, start_date, end_date, "month")
-# check_missing_dates(df_w_monthly, start_date, end_date, "month")
-# check_missing_dates(df_aq_yearly, start_date, end_date, "year")
-# check_missing_dates(df_w_yearly, start_date, end_date, "year")
+print.data.frame(head(df_aq_daily, 3))
+```
+```{r}
+print.data.frame(head(df_aq_stations, 3))
+```
+
+```{r}
+missing_dates <- check_missing_dates(df_aq_daily, start_date, end_date, "day")
+print(paste("The number of missing dates in the dataset from",
+  start_date, "to", end_date, "is:", length(missing_dates),
+  sep = " "
+))
+missing_dates <- NULL
 ```
 
 
-```{r results='hide', message=FALSE, warning=FALSE}
-get_ARPA_Lombardia_zoning(
-  plot_map = TRUE,
-  title = "ARPA Lombardia zoning",
-  line_type = 1,
-  line_size = 1,
-  xlab = "Longitude",
-  ylab = "Latitude"
+**Common pollutants among the stations**
+```{r}
+arpal_gap_summary <- ARPALdf_Summary(
+  df_aq_daily,
+  by_IDStat = TRUE,
+  by_Year = FALSE,
+  gap_length = TRUE,
+  correlation = FALSE,
+  histogram = FALSE,
+  density = FALSE,
+  outlier = FALSE,
+  verbose = FALSE
+)[["Gap_length"]]
+gap_df_list <- c()
+com_poll_names <- c()
+for (i in attributes(arpal_gap_summary)$names) {
+  if (nrow(arpal_gap_summary[i][[1]]) == length(aq_station_ids)) {
+    com_poll_names <- c(com_poll_names, i)
+    gap_df_list <- c(gap_df_list, arpal_gap_summary[i])
+  }
+}
+for (i in 1:length(gap_df_list)) {
+  print(print_table_custom(
+    t(gap_df_list[i][[1]]),
+    title = paste(com_poll_names[i], " - Gap in data (consecutive missing values)", sep = " ")
+  ))
+}
+gap_df_list <- NULL
+```
+
+
+**Station 548 - Milano v.Senato**
+```{r}
+print_table_custom(
+  df_aq_stations %>%
+    filter_dplyr(IDStation == 548) %>%
+    select(c(
+      IDSensor, Pollutant, Province, City,
+      Latitude, Longitude, Altitude, DateStart, DateStop
+    )) %>%
+    distinct() %>%
+    arrange(Pollutant),
+  title = "Station 548 - Milano v.Senato information"
+)
+```
+```{r}
+df_aq_m <- df_aq_daily %>% filter_dplyr(IDStation == 548)
+
+print_table_custom(
+  df_aq_m %>%
+    select(c(-IDStation, -NameStation, -Date)),
+  is_summary = TRUE, title = "Station 548 - Milano v.Senato daily data statistics",
+  highlight_rows = com_poll_names
 )
 ```
 
-```{r results='hide', message=FALSE, warning=FALSE}
-plot_AQ_W_stations(data_aq = df_aq_stations, data_w = df_w_stations, title = "Map of ARPA stations in Lombardy")
+
+**Station 571 - Bormio v.Monte Braulio**
+```{r}
+print_table_custom(df_aq_stations %>%
+  filter_dplyr(IDStation == 571) %>%
+  select(c(
+    IDSensor, Pollutant, Province, City,
+    Latitude, Longitude, Altitude, DateStart, DateStop
+  )) %>%
+  distinct() %>%
+  arrange(Pollutant), title = "Station 571 - Bormio v.Monte Braulio information")
+```
+```{r}
+df_aq_b <- df_aq_daily %>% filter_dplyr(IDStation == 571)
+
+print_table_custom(
+  df_aq_b %>%
+    select(c(-IDStation, -NameStation, -Date)),
+  is_summary = TRUE, title = "Station 571 - Bormio v.Monte Braulio daily data statistics",
+  highlight_rows = com_poll_names
+)
+```
+
+**Station 703 - Schivenoglia v. Malpasso**
+```{r}
+print_table_custom(df_aq_stations %>%
+  filter_dplyr(IDStation == 703) %>%
+  select(c(
+    IDSensor, Pollutant, Province, City,
+    Latitude, Longitude, Altitude, DateStart, DateStop
+  )) %>%
+  distinct() %>%
+  arrange(Pollutant), title = "Station 703 - Schivenoglia v. Malpasso information")
+```
+```{r}
+df_aq_s <- df_aq_daily %>% filter_dplyr(IDStation == 703)
+
+print_table_custom(
+  df_aq_s %>%
+    select(c(-IDStation, -NameStation, -Date)),
+  is_summary = TRUE, title = "Station 703 - Schivenoglia v. Malpasso daily data statistics",
+  highlight_rows = com_poll_names
+)
 ```
 
 
+```{r}
+for (i in 1:length(com_poll_names)) {
+  boxplot(
+    df_aq_daily[[com_poll_names[i]]] ~ as.factor(df_aq_daily$IDStation),
+    main = "Boxplot of common pollutants among the stations",
+    xlab = "Station ID",
+    ylab = pollutant_units[[com_poll_names[i]]],
+    col = station_colors,
+    las = 2
+  )
+}
+```
 
 
-# Exploratory Data Analysis
+## Time-related data
+```{r}
+ts_m <- xts(df_aq_m$PM10, order.by = df_aq_m$Date)
+ts_b <- xts(df_aq_b$PM10, order.by = df_aq_b$Date)
+ts_s <- xts(df_aq_s$PM10, order.by = df_aq_s$Date)
+
+plot(ts_m)
+```
+
+
 ```{r}
 # ALL DONE AMONGS THE AREAS
 # Clean and preprocess the data, handling missing values and outliers as necessary.
@@ -164,11 +296,14 @@ plot_AQ_W_stations(data_aq = df_aq_stations, data_w = df_w_stations, title = "Ma
 # Calculate summary statistics for air pollutants and meteorological variables.
 ```
 ```{r}
-tmp <- xts(df_aq_daily$NO2, order.by = df_aq_daily$Date)
-plot(xts(df_aq_yearly[df_aq_yearly$IDStation==548,"PM2.5"],order.by=df_aq_yearly[df_aq_yearly$IDStation==548,]$Date))
+# tmp <- xts(df_aq_daily$NO2, order.by = df_aq_daily$Date)
+# plot(xts(df_aq_yearly[df_aq_yearly$IDStation == 548, "PM2.5"], order.by = df_aq_yearly[df_aq_yearly$IDStation == 548, ]$Date))
 
-plot(xts(df_aq_monthly[df_aq_monthly$IDStation==548,"PM2.5"],order.by=df_aq_monthly[df_aq_monthly$IDStation==548,]$Date))
+# plot(xts(df_aq_monthly[df_aq_monthly$IDStation == 548, "PM2.5"], order.by = df_aq_monthly[df_aq_monthly$IDStation == 548, ]$Date))
 ```
+
+
+
 
 # Data engineering
 
@@ -198,6 +333,9 @@ plot(xts(df_aq_monthly[df_aq_monthly$IDStation==548,"PM2.5"],order.by=df_aq_mont
 ```{r}
 # Compare models with metrics and with "simpler" forecasting models
 ```
+"Ammonia"        "Arsenic"        "Benzene"        "Benzo_a_pyrene" "BlackCarbon"   
+"Cadmium"        "CO"             "Lead"           "Nikel"          "NO2"            "NOx"            "Ozone"          "PM_tot"        
+"PM10"           "PM2.5"          "Sulfur_dioxide"
 
 
 # Conclusions
