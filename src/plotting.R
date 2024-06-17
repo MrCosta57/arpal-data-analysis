@@ -1,58 +1,78 @@
-plot_ts_grid <- function(ts_list, n_row = 1, names, colors, ylab) {
-    # Set output parameters
-    par(
-        mfrow = c(n_row, ceiling(length(ts_list) / n_row))
-    )
+print_table_custom <- function(
+    df, title = "", is_summary = FALSE, full_width = FALSE,
+    style = c("striped", "hover", "condensed", "responsive"), highlight_rows = NULL) {
+  if (is_summary) {
+    df <- t(do.call(cbind, lapply(df, summary)))
+  }
 
-    # Plot each single time series
-    for (name in names) {
-        plot(
-            ts_list[[name]],
-            main = name,
-            col = colors[[name]],
-            ylab = ylab
-        )
-        grid()
+  # Check if row highlighting is enabled
+  if (!is.null(highlight_rows)) {
+    # Convert row names to indices if they are provided as names
+    if (is.character(highlight_rows)) {
+      highlight_rows <- which(rownames(df) %in% highlight_rows, arr.ind = TRUE)
     }
-
-    # Reset the plotting parameters
-    par(mfrow = c(1, 1))
+    return(kable(df, caption = title) %>%
+      kable_styling(full_width = full_width, bootstrap_options = style) %>%
+      row_spec(highlight_rows, extra_css = "background-color: rgba(104, 187, 227, 0.25);"))
+  } else {
+    return(kable(df, caption = title) %>%
+      kable_styling(full_width = full_width, bootstrap_options = style))
+  }
 }
 
-plot_multiple_ts <- function(ts_list, names, colors, main, ylab, lwd = 1, lty = NULL) {
-    # Plot the first time series
-    ?plot
-    if (is.null(lty)) {
-        lty_ <- "solid"
-    } else {
-        lty_ <- lty[1]
-    }
-    plot(
-        ts_list[[names[1]]],
-        xlim = range(do.call(c, lapply(ts_list, time)), na.rm = TRUE),
-        ylim = range(unlist(ts_list), na.rm = TRUE),
-        type = "l", col = colors[[names[1]]],
-        main = main, xlab = "Year", ylab = ylab, lwd = lwd, lty = lty_
-    )
-    grid()
 
-    # Add the remaining time series to the plot
-    for (i in 2:length(names)) {
-        if (is.null(lty)) {
-            lty_ <- "solid"
-        } else {
-            (lty_ <- lty[i])
-        }
-        i_name <- names[i]
-        lines(ts_list[[i_name]], type = "l", lwd = lwd, lty = lty_, col = colors[[i_name]])
-    }
+plot_ts_grid <- function(ts_list, ts_names, ts_colors, ylab, n_row = 1) {
+  # Check if the length of colors matches the number of time series
+  if (length(ts_colors) != length(ts_list)) {
+    stop("Length of 'colors' must be equal to the length of 'ts_list'.")
+  }
+  # Check if the length of ts_names matches the number of time series
+  if (length(ts_names) != length(ts_list)) {
+    stop("Length of 'ts_names' must be equal to the length of 'ts_list'.")
+  }
+  # Determine the number of columns based on n_row
+  n_col <- ceiling(length(ts_list) / n_row)
+  # Set up the plotting area
+  par(mfrow = c(n_row, n_col), mar = c(4, 4, 2, 1))
+  # Loop over each time series and plot it
+  for (i in seq_along(ts_list)) {
+    print(plot(
+      ts_list[[i]],
+      type = "l",
+      col = ts_colors[i],
+      lwd = 2,
+      main = ts_names[i],
+      ylab = ylab,
+      xlab = "Time",
+      grid.col = "lightgray",
+      grid.ticks.lty = 2,
+      yaxis.right = FALSE
+    ))
+  }
+  # Reset plotting parameters to default
+  par(mfrow = c(1, 1))
+}
 
-    # Add legend
-    legend(
-        "topleft",
-        legend = names, cex = 0.6,
-        lty = lty, lwd = 2, col = unlist(colors)
-    )
+plot_3_ts <- function(ts1, ts2, ts3, ts_colors, main, ylab, legend_names) {
+  # Find the range for the y-axis
+  y_range <- range(sapply(list(ts1, ts2, ts3), range, na.rm = TRUE))
+
+  plot(
+    ts1,
+    lty = 1,
+    col = ts_colors[1], lwd = 1, main = main,
+    ylab = ylab, ylim = y_range, xlab = "Time",
+    grid.col = "lightgray",
+    grid.ticks.lty = 2, yaxis.right = FALSE
+  )
+  lines(ts2, col = ts_colors[2], lwd = 1, lty = 1)
+  lines(ts3, col = ts_colors[3], lwd = 1, lty = 1)
+  # # Add a legend
+  addLegend("topleft",
+    legend.names = legend_names,
+    lty = c(1, 1, 1), lwd = c(1, 1, 1),
+    col = ts_colors
+  )
 }
 
 
@@ -69,27 +89,28 @@ plot_AQ_stations <- function(data_aq,
     )
     return(invisible(NULL))
   }
-  
+
   Lombardia <- get_Lombardia_geospatial(NUTS_level = "NUTS3")
   if (is.null(Lombardia)) {
     message(
       "The map will not include the ground layer with Lombardy's shapefile. Only points/coordinates will be plot."
     )
   }
-  
+
   Stats_aq <- get_ARPA_Lombardia_AQ_registry()
-  
+
   data_aq <- data.frame(IDStation = unique(data_aq$IDStation))
   d_aq <- dplyr::left_join(data_aq, Stats_aq, by = "IDStation")
   d_aq <- d_aq %>%
     dplyr::select(IDStation, Longitude, Latitude) %>%
     dplyr::distinct() %>%
+    dplyr::arrange(IDStation) %>%
     sf::st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326)
-  
+
   # Add a column for colors to d_aq
   d_aq <- d_aq %>%
-    dplyr::mutate(color = col_points[1:nrow(d_aq)])
-  
+    dplyr::mutate(color = col_points)
+
   geo_plot <- Lombardia %>% ggplot2::ggplot() +
     ggplot2::geom_sf(linetype = prov_line_type, size = prov_line_size) +
     ggplot2::geom_sf(data = d_aq, aes(color = color), size = 3) +
@@ -107,7 +128,7 @@ plot_AQ_stations <- function(data_aq,
         paste0(x, "°", "N")
       }
     )
-  
+
   print(geo_plot)
 }
 

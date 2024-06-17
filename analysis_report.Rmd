@@ -61,7 +61,7 @@ Particulate Matter 10 (PM10)
 # Pre-requirements
 
 set.seed(123) # set pseudorandom generator for reprocucibility
-requirements <- c("dplyr", "ggplot2", "kableExtra", "ARPALData", "xts", "forecast", "TSA")
+requirements <- c("dplyr", "ggplot2", "kableExtra", "ARPALData", "imputeTS", "xts", "forecast", "TSA")
 for (library_name in requirements) {
   if (!require(library_name, character.only = TRUE, exclude = if (library_name == "dplyr") c("lag", "filter") else NULL)) {
     install.packages(library_name, repos = "https://cloud.r-project.org")
@@ -72,8 +72,8 @@ lag_dplyr <- dplyr::lag
 filter_dplyr <- dplyr::filter
 
 # Import user defined functions
-source("utils.R")
-source("plotting.R")
+source("src/utils.R")
+source("src/plotting.R")
 
 # library(styler)
 # style_file("analysis_report.Rmd")
@@ -86,7 +86,9 @@ start_date <- "2014-01-01"
 end_date <- "2023-12-31"
 # Milano v.Senato, Bormio v.Monte Braulio, Schivenoglia v. Malpasso
 aq_station_ids <- c(548, 571, 703)
-station_colors <- c("#53b400", "#00c094", "#00b6eb")
+aq_station_names <- c("Station 548 - Milano v.Senato", "Station 571 - Bormio v.Monte Braulio", "Station 703 - Schivenoglia v. Malpasso")
+station_colors <- c("steelblue", "darkorange", "#009E73")
+
 # pollutant : unit of measure mapping
 pollutant_units <- list(
   "Benzene" = "µg/m³",
@@ -130,7 +132,7 @@ The stations measures different pollutants and where the columns in the dataset 
 
 ## Raw data
 
-```{r echo=FALSE,out.width="49%", out.height="20%", fig.cap="caption", fig.show='hold'}
+```{r echo=FALSE,out.width="50%", out.height="20%", fig.cap="caption", fig.show='hold'}
 knitr::include_graphics(c("assets/images/zoning.png", "assets/images/stations_map.png"))
 ``` 
 
@@ -164,6 +166,7 @@ missing_dates <- NULL
 
 **Common pollutants among the stations**
 ```{r}
+summary(df_aq_m)
 arpal_gap_summary <- ARPALdf_Summary(
   df_aq_daily,
   by_IDStat = TRUE,
@@ -183,13 +186,13 @@ for (i in attributes(arpal_gap_summary)$names) {
     gap_df_list <- c(gap_df_list, arpal_gap_summary[i])
   }
 }
-for (i in 1:length(gap_df_list)) {
-  print(print_table_custom(
-    t(gap_df_list[i][[1]]),
-    title = paste(com_poll_names[i], " - Gap in data (consecutive missing values)", sep = " ")
-  ))
-}
-gap_df_list <- NULL
+# for (i in 1:length(gap_df_list)) {
+#  print(print_table_custom(
+#    as.data.frame(t(gap_df_list[i][[1]])),
+#    title = paste(com_poll_names[i], " - Gap in data (consecutive missing values)", sep = " ")
+#  ))
+# }
+# gap_df_list <- NULL
 ```
 
 
@@ -204,7 +207,7 @@ print_table_custom(
     )) %>%
     distinct() %>%
     arrange(Pollutant),
-  title = "Station 548 - Milano v.Senato information"
+  title = paste(aq_station_names[1], "information")
 )
 ```
 ```{r}
@@ -213,7 +216,7 @@ df_aq_m <- df_aq_daily %>% filter_dplyr(IDStation == 548)
 print_table_custom(
   df_aq_m %>%
     select(c(-IDStation, -NameStation, -Date)),
-  is_summary = TRUE, title = "Station 548 - Milano v.Senato daily data statistics",
+  is_summary = TRUE, title = paste(aq_station_names[1], "daily data statistics"),
   highlight_rows = com_poll_names
 )
 ```
@@ -228,7 +231,7 @@ print_table_custom(df_aq_stations %>%
     Latitude, Longitude, Altitude, DateStart, DateStop
   )) %>%
   distinct() %>%
-  arrange(Pollutant), title = "Station 571 - Bormio v.Monte Braulio information")
+  arrange(Pollutant), title = paste(aq_station_names[2], "information"))
 ```
 ```{r}
 df_aq_b <- df_aq_daily %>% filter_dplyr(IDStation == 571)
@@ -236,7 +239,7 @@ df_aq_b <- df_aq_daily %>% filter_dplyr(IDStation == 571)
 print_table_custom(
   df_aq_b %>%
     select(c(-IDStation, -NameStation, -Date)),
-  is_summary = TRUE, title = "Station 571 - Bormio v.Monte Braulio daily data statistics",
+  is_summary = TRUE, title = paste(aq_station_names[2], "daily data statistics"),
   highlight_rows = com_poll_names
 )
 ```
@@ -250,7 +253,7 @@ print_table_custom(df_aq_stations %>%
     Latitude, Longitude, Altitude, DateStart, DateStop
   )) %>%
   distinct() %>%
-  arrange(Pollutant), title = "Station 703 - Schivenoglia v. Malpasso information")
+  arrange(Pollutant), title = paste(aq_station_names[3], "information"))
 ```
 ```{r}
 df_aq_s <- df_aq_daily %>% filter_dplyr(IDStation == 703)
@@ -258,7 +261,7 @@ df_aq_s <- df_aq_daily %>% filter_dplyr(IDStation == 703)
 print_table_custom(
   df_aq_s %>%
     select(c(-IDStation, -NameStation, -Date)),
-  is_summary = TRUE, title = "Station 703 - Schivenoglia v. Malpasso daily data statistics",
+  is_summary = TRUE, title = paste(aq_station_names[3], "daily data statistics"),
   highlight_rows = com_poll_names
 )
 ```
@@ -279,15 +282,53 @@ for (i in 1:length(com_poll_names)) {
 
 
 ## Time-related data
+imputeTS^[Moritz S, Bartz-Beielstein T (2017). "imputeTS: Time Series Missing Value Imputation in R." The R Journal, 9(1), 207–218. doi:10.32614/RJ-2017-009.]^ package is used to impute missing values in the time series data.
 ```{r}
 ts_m <- xts(df_aq_m$PM10, order.by = df_aq_m$Date)
 ts_b <- xts(df_aq_b$PM10, order.by = df_aq_b$Date)
 ts_s <- xts(df_aq_s$PM10, order.by = df_aq_s$Date)
-
-plot(ts_m)
+```
+```{r fig.height=6, fig.width=12}
+plot_3_ts(
+  ts1 = ts_m, ts2 = ts_b, ts3 = ts_s,
+  ts_colors = station_colors,
+  main = "PM10 time series for the stations",
+  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
+  legend_names = aq_station_names
+)
+```
+```{r fig.height=10, fig.width=12}
+plot_ts_grid(
+  ts_list = list(ts_m, ts_b, ts_s),
+  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
+  colors = station_colors,
+  n_row = 3,
+  ts_names = aq_station_names
+)
 ```
 
+```{r}
+agg_df_aq_s <- ARPALData::Time_aggregate(
+  df_aq_s, "monthly", Var_vec="PM10", Fns_vec=c("mean")
+)
+agg_df_aq_b <- ARPALData::Time_aggregate(
+  df_aq_b, "monthly", Var_vec="PM10", Fns_vec="mean"
+)
+agg_df_aq_m <- ARPALData::Time_aggregate(
+  df_aq_m, "monthly", Var_vec="PM10", Fns_vec="mean"
+)
 
+plot_ts_grid(
+  ts_list = list(
+    xts(agg_df_aq_m$PM10, order.by = agg_df_aq_m$Date),
+    xts(agg_df_aq_b$PM10, order.by = agg_df_aq_b$Date),
+    xts(agg_df_aq_s$PM10, order.by = agg_df_aq_s$Date)
+    ),
+  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
+  ts_colors = station_colors,
+  n_row = 3,
+  ts_names = aq_station_names
+)
 ```{r}
 # ALL DONE AMONGS THE AREAS
 # Clean and preprocess the data, handling missing values and outliers as necessary.
