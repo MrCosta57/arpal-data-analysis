@@ -166,35 +166,17 @@ missing_dates <- NULL
 
 **Common pollutants among the stations**
 ```{r}
-summary(df_aq_m)
-arpal_gap_summary <- ARPALdf_Summary(
-  df_aq_daily,
-  by_IDStat = TRUE,
-  by_Year = FALSE,
-  gap_length = TRUE,
-  correlation = FALSE,
-  histogram = FALSE,
-  density = FALSE,
-  outlier = FALSE,
-  verbose = FALSE
-)[["Gap_length"]]
-gap_df_list <- c()
-com_poll_names <- c()
-for (i in attributes(arpal_gap_summary)$names) {
-  if (nrow(arpal_gap_summary[i][[1]]) == length(aq_station_ids)) {
-    com_poll_names <- c(com_poll_names, i)
-    gap_df_list <- c(gap_df_list, arpal_gap_summary[i])
-  }
-}
-# for (i in 1:length(gap_df_list)) {
-#  print(print_table_custom(
-#    as.data.frame(t(gap_df_list[i][[1]])),
-#    title = paste(com_poll_names[i], " - Gap in data (consecutive missing values)", sep = " ")
-#  ))
-# }
-# gap_df_list <- NULL
-```
+df_aq_m <- df_aq_daily %>% filter_dplyr(IDStation == 548)
+df_aq_b <- df_aq_daily %>% filter_dplyr(IDStation == 571)
+df_aq_s <- df_aq_daily %>% filter_dplyr(IDStation == 703)
 
+com_poll_names <- find_common_pollutants(
+  df_aq_m %>% dplyr::select(-IDStation, -NameStation, -Date),
+  df_aq_b %>% dplyr::select(-IDStation, -NameStation, -Date),
+  df_aq_s %>% dplyr::select(-IDStation, -NameStation, -Date)
+)
+print(paste("Common pollutants among the stations:", paste(com_poll_names, collapse = ", ")))
+```
 
 **Station 548 - Milano v.Senato**
 ```{r}
@@ -211,8 +193,6 @@ print_table_custom(
 )
 ```
 ```{r}
-df_aq_m <- df_aq_daily %>% filter_dplyr(IDStation == 548)
-
 print_table_custom(
   df_aq_m %>%
     select(c(-IDStation, -NameStation, -Date)),
@@ -220,7 +200,6 @@ print_table_custom(
   highlight_rows = com_poll_names
 )
 ```
-
 
 **Station 571 - Bormio v.Monte Braulio**
 ```{r}
@@ -234,8 +213,6 @@ print_table_custom(df_aq_stations %>%
   arrange(Pollutant), title = paste(aq_station_names[2], "information"))
 ```
 ```{r}
-df_aq_b <- df_aq_daily %>% filter_dplyr(IDStation == 571)
-
 print_table_custom(
   df_aq_b %>%
     select(c(-IDStation, -NameStation, -Date)),
@@ -256,8 +233,6 @@ print_table_custom(df_aq_stations %>%
   arrange(Pollutant), title = paste(aq_station_names[3], "information"))
 ```
 ```{r}
-df_aq_s <- df_aq_daily %>% filter_dplyr(IDStation == 703)
-
 print_table_custom(
   df_aq_s %>%
     select(c(-IDStation, -NameStation, -Date)),
@@ -309,13 +284,16 @@ plot_ts_grid(
 
 ```{r}
 agg_df_aq_s <- ARPALData::Time_aggregate(
-  df_aq_s, "monthly", Var_vec="PM10", Fns_vec=c("mean")
+  df_aq_s, "monthly",
+  Var_vec = "PM10", Fns_vec = "mean"
 )
 agg_df_aq_b <- ARPALData::Time_aggregate(
-  df_aq_b, "monthly", Var_vec="PM10", Fns_vec="mean"
+  df_aq_b, "monthly",
+  Var_vec = "PM10", Fns_vec = "mean"
 )
 agg_df_aq_m <- ARPALData::Time_aggregate(
-  df_aq_m, "monthly", Var_vec="PM10", Fns_vec="mean"
+  df_aq_m, "monthly",
+  Var_vec = "PM10", Fns_vec = "mean"
 )
 
 plot_ts_grid(
@@ -323,12 +301,15 @@ plot_ts_grid(
     xts(agg_df_aq_m$PM10, order.by = agg_df_aq_m$Date),
     xts(agg_df_aq_b$PM10, order.by = agg_df_aq_b$Date),
     xts(agg_df_aq_s$PM10, order.by = agg_df_aq_s$Date)
-    ),
+  ),
   ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
   ts_colors = station_colors,
   n_row = 3,
   ts_names = aq_station_names
 )
+```
+
+
 ```{r}
 # ALL DONE AMONGS THE AREAS
 # Clean and preprocess the data, handling missing values and outliers as necessary.
@@ -336,13 +317,6 @@ plot_ts_grid(
 # Visualize the data using plots such as time series, scatter plots, and histograms.
 # Calculate summary statistics for air pollutants and meteorological variables.
 ```
-```{r}
-# tmp <- xts(df_aq_daily$NO2, order.by = df_aq_daily$Date)
-# plot(xts(df_aq_yearly[df_aq_yearly$IDStation == 548, "PM2.5"], order.by = df_aq_yearly[df_aq_yearly$IDStation == 548, ]$Date))
-
-# plot(xts(df_aq_monthly[df_aq_monthly$IDStation == 548, "PM2.5"], order.by = df_aq_monthly[df_aq_monthly$IDStation == 548, ]$Date))
-```
-
 
 
 
