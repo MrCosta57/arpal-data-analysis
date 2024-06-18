@@ -1,6 +1,7 @@
 print_table_custom <- function(
     df, title = "", is_summary = FALSE, full_width = FALSE,
-    style = c("striped", "hover", "condensed", "responsive"), highlight_rows = NULL) {
+    style = c("striped", "hover", "condensed", "responsive"),
+    highlight_rows = NULL) {
   if (is_summary) {
     df <- t(do.call(cbind, lapply(df, summary)))
   }
@@ -20,6 +21,20 @@ print_table_custom <- function(
   }
 }
 
+plot_single_ts <- function(ts, ts_name, ts_color, ylab) {
+  plot(
+    ts,
+    type = "l",
+    col = ts_color,
+    lwd = 1,
+    main = ts_name,
+    ylab = ylab,
+    xlab = "Time",
+    grid.col = "lightgray",
+    grid.ticks.lty = 2,
+    yaxis.right = FALSE
+  )
+}
 
 plot_ts_grid <- function(ts_list, ts_names, ts_colors, ylab, n_row = 1) {
   # Check if the length of colors matches the number of time series
@@ -36,18 +51,14 @@ plot_ts_grid <- function(ts_list, ts_names, ts_colors, ylab, n_row = 1) {
   par(mfrow = c(n_row, n_col), mar = c(4, 4, 2, 1))
   # Loop over each time series and plot it
   for (i in seq_along(ts_list)) {
-    print(plot(
-      ts_list[[i]],
-      type = "l",
-      col = ts_colors[i],
-      lwd = 2,
-      main = ts_names[i],
-      ylab = ylab,
-      xlab = "Time",
-      grid.col = "lightgray",
-      grid.ticks.lty = 2,
-      yaxis.right = FALSE
-    ))
+    print(
+      plot_single_ts(
+        ts = ts_list[[i]],
+        ts_name = ts_names[i],
+        ts_color = ts_colors[i],
+        ylab = ylab
+      )
+    )
   }
   # Reset plotting parameters to default
   par(mfrow = c(1, 1))
@@ -73,6 +84,85 @@ plot_3_ts <- function(ts1, ts2, ts3, ts_colors, main, ylab, legend_names) {
     lty = c(1, 1, 1), lwd = c(1, 1, 1),
     col = ts_colors
   )
+}
+
+plot_stl_components <- function(ts_list, names, component_name, s_window = 13, robust = FALSE, main, ylab) {
+  # Set up multiple plots in a single column
+  par(mfrow = c(length(ts_list), 1), oma = c(0, 0, 2, 0))
+
+  for (name in names) {
+    ts <- ts_list[[name]]
+
+    # Decompose the specified component
+    decomposition <- stl(ts, s.window = s_window)
+    component <- decomposition$time.series[, component_name]
+
+    # Plot the component
+    plot(
+      component,
+      main = name,
+      ylab = ylab
+    )
+  }
+  # Add a main title for the entire plot
+  mtext(main, side = 3, line = -2, padj = -1, outer = TRUE)
+
+  # Reset the plotting layout
+  par(mfrow = c(1, 1), oma = c(0, 0, 0, 0))
+}
+
+plot_filtered_ts <- function(original_ts, filtered_ts_list, line_colors, legend_names, main, ylab) {
+  # Plot the original time series
+  plot(
+    original_ts,
+    main = main,
+    ylab = ylab,
+    col = "dimgray"
+  )
+
+  for (i in 1:length(filtered_ts_list)) {
+    lines(
+      filtered_ts_list[[i]],
+      lwd = 2, lty = "dashed",
+      col = line_colors[i]
+    )
+  }
+
+  # addLegend("topleft",
+  #  legend.names = legend_names,
+  #  lty = "dashed", lwd = 2,
+  #  col = line_colors
+  # )
+}
+
+plot_periodogram <- function(ts) {
+  # Compute the periodogram
+  pgram <- TSA::periodogram(ts, plot = FALSE)
+  # Frequencies and spectrum
+  frequencies <- pgram$freq * length(ts)
+  spectrum <- pgram$spec / length(ts)
+
+  # Define labels for the x-axis
+  x_labels <- c(1, 2, 4, 6, 12, 26, 52, 104)
+  x_labels_text <- c(
+    "Annual (1)", "Semiannual (2)", "Quarterly (4)",
+    "Bimonthly (6)", "Monthly (12)", "Biweekly (26)",
+    "Weekly (52)", "Semiweekly (104)"
+  )
+
+  # Create a data frame for plotting
+  df <- data.frame(frequencies = frequencies, spectrum = spectrum)
+
+  # Plot using ggplot2
+  p <- ggplot(df, aes(x = frequencies, y = spectrum)) +
+    geom_step(color = "purple") +
+    scale_x_log10(breaks = x_labels, labels = x_labels_text) +
+    scale_y_continuous(labels = scientific) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+    labs(x = "Frequency", y = "Variance", title = "Periodogram")
+
+  return(p)
 }
 
 
@@ -131,7 +221,6 @@ plot_AQ_stations <- function(data_aq,
 
   print(geo_plot)
 }
-
 
 
 plot_zoning_map <- function(title = "ARPA Lombardia zoning",
