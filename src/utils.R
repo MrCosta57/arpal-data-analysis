@@ -44,6 +44,13 @@ rgb2hex_custom <- function(x) {
   return(rgb(x[1], x[2], x[3], maxColorValue = 255))
 }
 
+
+xts2ts <- function(xts_obj, frequency = 12) {
+  start_date <- c(as.integer(format(start(xts_obj), "%Y")), as.integer(format(start(xts_obj), "%m")))
+  ts_obj <- ts(as.numeric(xts_obj), frequency = frequency, start = start_date)
+  return(ts_obj)
+}
+
 apply_filtering <- function(input_ts, weights) {
   # Apply the filter to the time series
   filtered_ts <- filter(input_ts, weights, sides = 2)
@@ -66,3 +73,9 @@ spencer_filtering <- function(input_ts) {
   spencer_ts <- apply_filtering(input_ts, weights_spencer)
   return(spencer_ts)
 }
+
+# library(xts)
+# a<-xts(rnorm(1000), order.by = seq(as.Date("2021-01-01"), by = "day", length.out = 1000), frequency = 7)
+# plot(a)
+
+# plot(stl(ts(as.numeric(ts_m), frequency = 7), s.window = "periodic"))

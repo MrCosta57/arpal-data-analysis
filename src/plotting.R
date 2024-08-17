@@ -22,7 +22,7 @@ print_table_custom <- function(
 }
 
 plot_single_ts <- function(ts, ts_name, ts_color, ylab) {
-  plot(
+  plot.xts(
     ts,
     type = "l",
     col = ts_color,
@@ -68,7 +68,7 @@ plot_3_ts <- function(ts1, ts2, ts3, ts_colors, main, ylab, legend_names) {
   # Find the range for the y-axis
   y_range <- range(sapply(list(ts1, ts2, ts3), range, na.rm = TRUE))
 
-  plot(
+  plot.xts(
     ts1,
     lty = 1,
     col = ts_colors[1], lwd = 1, main = main,
@@ -84,31 +84,6 @@ plot_3_ts <- function(ts1, ts2, ts3, ts_colors, main, ylab, legend_names) {
     lty = c(1, 1, 1), lwd = c(1, 1, 1),
     col = ts_colors
   )
-}
-
-plot_stl_components <- function(ts_list, names, component_name, s_window = 13, robust = FALSE, main, ylab) {
-  # Set up multiple plots in a single column
-  par(mfrow = c(length(ts_list), 1), oma = c(0, 0, 2, 0))
-
-  for (name in names) {
-    ts <- ts_list[[name]]
-
-    # Decompose the specified component
-    decomposition <- stl(ts, s.window = s_window)
-    component <- decomposition$time.series[, component_name]
-
-    # Plot the component
-    plot(
-      component,
-      main = name,
-      ylab = ylab
-    )
-  }
-  # Add a main title for the entire plot
-  mtext(main, side = 3, line = -2, padj = -1, outer = TRUE)
-
-  # Reset the plotting layout
-  par(mfrow = c(1, 1), oma = c(0, 0, 0, 0))
 }
 
 plot_filtered_ts <- function(original_ts, filtered_ts_list, line_colors, legend_names, main, ylab) {
@@ -128,11 +103,11 @@ plot_filtered_ts <- function(original_ts, filtered_ts_list, line_colors, legend_
     )
   }
 
-  # addLegend("topleft",
-  #  legend.names = legend_names,
-  #  lty = "dashed", lwd = 2,
-  #  col = line_colors
-  # )
+  legend("topleft",
+    legend = legend_names,
+    lty = "dashed", lwd = 2,
+    col = line_colors
+  )
 }
 
 plot_periodogram <- function(ts) {
