@@ -61,9 +61,9 @@ Comprehensive Indicator: PM10 reflects the presence of particulate pollution fro
 Health Impact: PM10 is directly linked to adverse health effects, making it a crucial measure of air quality.
 Correlations: Other pollutants (Benzene, CO, NO2, and NOx) can contribute to the levels of PM10 through primary emissions and secondary reactions, making them suitable predictor variables for analyzing variations in PM10.
 
+Data are daily but will be aggregated by month to perform a long term analysis and understand better the components. Later model on daily data will be developed to forecast the air quality in the region.
 ```{r}
 # Pre-requirements
-
 set.seed(123) # set pseudorandom generator for reprocucibility
 requirements <- c("dplyr", "ggplot2", "kableExtra", "ARPALData", "imputeTS", "xts", "forecast", "TSA")
 for (library_name in requirements) {
@@ -78,6 +78,8 @@ filter_dplyr <- dplyr::filter
 # Import user defined functions
 source("src/utils.R")
 source("src/plotting.R")
+source("src/smoothing.R")
+source("src/forecasting.R")
 
 # library(styler)
 # style_file("analysis_report.Rmd")
@@ -86,9 +88,10 @@ source("src/plotting.R")
 # Dataset description
 ```{r}
 # Data retrieval
-
 start_date <- "2014-01-01"
 end_date <- "2023-12-31"
+date_range <- seq(from = as.Date(start_date), to = as.Date(end_date), by = 1)
+
 # Milano v.Senato, Bormio v.Monte Braulio, Schivenoglia v. Malpasso
 aq_station_ids <- c(548, 571, 703)
 aq_station_names_code <- c("Station 548", "Station 571", "Station 703")
@@ -136,8 +139,7 @@ aq_station_ids <- c(548, 571, 703)
 
 The stations measures different pollutants and where the columns in the dataset are all `NA` this means that the station have no sensors for measuring that pollutant in the air 
 
-# First data overview
-
+# Data overview and preprocessing
 ```{r echo=FALSE,out.width="50%", out.height="20%", fig.cap="caption", fig.show='hold'}
 # plot_zoning_map(
 #  title = "ARPA Lombardia zoning",
@@ -179,6 +181,7 @@ com_poll_names <- find_common_pollutants(
 print(paste("Common pollutants among the stations:", paste(com_poll_names, collapse = ", ")))
 ```
 
+## Raw data
 **Station 548 - Milano v.Senato**
 ```{r}
 print_table_custom(
@@ -255,8 +258,7 @@ for (i in 1:length(com_poll_names)) {
 }
 ```
 
-
-# Exploratory Data Analysis (EDA)
+## Time series data
 ```{r}
 ts_m <- xts(df_aq_m$PM10, order.by = df_aq_m$Date)
 ts_b <- xts(df_aq_b$PM10, order.by = df_aq_b$Date)
@@ -286,40 +288,9 @@ ts_b <- xts2ts(ts_b, 365.25)
 ts_s <- xts2ts(ts_s, 365.25)
 ```
 
-```{r}
-agg_df_aq_m <- ARPALData::Time_aggregate(
-  df_aq_m, "monthly",
-  Var_vec = "PM10", Fns_vec = "mean"
-)
-agg_df_aq_b <- ARPALData::Time_aggregate(
-  df_aq_b, "monthly",
-  Var_vec = "PM10", Fns_vec = "mean"
-)
-agg_df_aq_s <- ARPALData::Time_aggregate(
-  df_aq_s, "monthly",
-  Var_vec = "PM10", Fns_vec = "mean"
-)
-ts_m_monthly <- xts(agg_df_aq_m$PM10, order.by = agg_df_aq_m$Date)
-ts_b_monthly <- xts(agg_df_aq_b$PM10, order.by = agg_df_aq_b$Date)
-ts_s_monthly <- xts(agg_df_aq_s$PM10, order.by = agg_df_aq_s$Date)
+## Missing values imputation
+Important to fill missing values when conisdering the daily data
 
-plot_ts_grid(
-  ts_list = list(ts_m_monthly, ts_b_monthly, ts_s_monthly),
-  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
-  ts_colors = station_colors,
-  n_row = 3,
-  ts_names = aq_station_names_full
-)
-agg_df_aq_m <- NULL
-agg_df_aq_b <- NULL
-agg_df_aq_s <- NULL
-ts_m_monthly <- xts2ts(ts_m_monthly, 12)
-ts_b_monthly <- xts2ts(ts_b_monthly, 12)
-ts_s_monthly <- xts2ts(ts_s_monthly, 12)
-```
-
-
-# Missing values imputation 
 "Length of time series" - Number of observations in the time series (including NAs)
 "Number of Missing Values" - Number of missing values in the time series
 "Number of Gaps" - Number of NA gaps (consisting of one or more consecutive NAs) in the time series
@@ -348,7 +319,6 @@ stats_na_table
 ```
 
 ```{r fig.height=4, fig.width=10}
-date_range <- seq(from = as.Date(start_date), to = as.Date(end_date), by = 1)
 imputeTS::ggplot_na_distribution(ts_m,
   x_axis_labels = date_range,
   title = paste(aq_station_names_code[1], "-", "missing values"),
@@ -391,30 +361,30 @@ ts_b_imputed <- imputeTS::na_interpolation(ts_b)
 ts_s_imputed <- imputeTS::na_interpolation(ts_s)
 
 imputeTS::ggplot_na_imputations(
-  window(xts(as.numeric(ts_m), order.by = df_aq_m$Date), start = "2021-01-01", end = "2022-12-31"),
-  window(xts(as.numeric(ts_m_imputed), order.by = df_aq_m$Date), start = "2021-01-01", end = "2022-12-31"),
+  window_ts_xts(ts_m, df_aq_m$Date, "2021-01-01", "2022-12-31"),
+  window_ts_xts(ts_m_imputed, df_aq_m$Date, "2021-01-01", "2022-12-31"),
   title = paste(aq_station_names_short[1], "-", "Linear imputation"),
-  x_axis_labels = time(window(xts(as.numeric(ts_m), order.by = df_aq_m$Date), start = "2021-01-01", end = "2022-12-31")),
+  x_axis_labels = time(window_ts_xts(ts_m, df_aq_m$Date, "2021-01-01", "2022-12-31")),
   color_points = station_colors[1],
   color_lines = rgb2hex_custom(col2rgb_custom(station_colors[1], 0.6)),
   color_imputations = "red",
   ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = "")
 )
 imputeTS::ggplot_na_imputations(
-  window(xts(as.numeric(ts_b), order.by = df_aq_b$Date), start = "2014-01-01", end = "2015-12-31"),
-  window(xts(as.numeric(ts_b_imputed), order.by = df_aq_b$Date), start = "2014-01-01", end = "2015-12-31"),
+  window_ts_xts(ts_b, df_aq_b$Date, "2014-01-01", "2015-12-31"),
+  window_ts_xts(ts_b_imputed, df_aq_b$Date, "2014-01-01", "2015-12-31"),
   title = paste(aq_station_names_short[2], "-", "Linear imputation"),
-  x_axis_labels = time(window(xts(as.numeric(ts_b), order.by = df_aq_b$Date), start = "2014-01-01", end = "2015-12-31")),
+  x_axis_labels = time(window_ts_xts(ts_b, df_aq_b$Date, "2014-01-01", "2015-12-31")),
   color_points = station_colors[2],
   color_lines = rgb2hex_custom(col2rgb_custom(station_colors[2], 0.6)),
   color_imputations = "red",
   ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = "")
 )
 imputeTS::ggplot_na_imputations(
-  window(xts(as.numeric(ts_s), order.by = df_aq_s$Date), start = "2016-01-01", end = "2017-12-31"),
-  window(xts(as.numeric(ts_s_imputed), order.by = df_aq_s$Date), start = "2016-01-01", end = "2017-12-31"),
+  window_ts_xts(ts_s, df_aq_s$Date, "2016-01-01", "2017-12-31"),
+  window_ts_xts(ts_s_imputed, df_aq_s$Date, "2016-01-01", "2017-12-31"),
   title = paste(aq_station_names_short[3], "-", "Linear imputation"),
-  x_axis_labels = time(window(xts(as.numeric(ts_s), order.by = df_aq_s$Date), start = "2016-01-01", end = "2017-12-31")),
+  x_axis_labels = time(window_ts_xts(ts_s, df_aq_s$Date, "2016-01-01", "2017-12-31")),
   color_points = station_colors[3],
   color_lines = rgb2hex_custom(col2rgb_custom(station_colors[3], 0.6)),
   color_imputations = "red",
@@ -423,9 +393,24 @@ imputeTS::ggplot_na_imputations(
 ts_m <- ts_m_imputed
 ts_b <- ts_b_imputed
 ts_s <- ts_s_imputed
+df_aq_m$PM10 <- as.numeric(ts_m_imputed)
+df_aq_b$PM10 <- as.numeric(ts_b_imputed)
+df_aq_s$PM10 <- as.numeric(ts_s_imputed)
+```
+```{r}
+print(
+  paste(
+    "Number of NA values in PM10 among the station are: ",
+    sum(
+      sum(is.na(df_aq_m$PM10)),
+      sum(is.na(df_aq_m$PM10)),
+      sum(is.na(df_aq_b$PM10))
+    )
+  )
+)
 ```
 
-# Outliers detection
+## Outliers detection
 ```{r}
 outliers_ts_m <- tsoutliers(ts_m)
 outliers_ts_b <- tsoutliers(ts_b)
@@ -478,8 +463,42 @@ tmp_ts_b <- NULL
 tmp_ts_s <- NULL
 ```
 
-# Filtering and decomposition
 
+# Time series data analysis
+Data are aggregated by month so a long term analysis can be performed, as said. Also by aggregation in months, daily NA values are neglected
+```{r}
+agg_df_aq_m <- ARPALData::Time_aggregate(
+  df_aq_m, "monthly",
+  Var_vec = "PM10", Fns_vec = "mean"
+)
+agg_df_aq_b <- ARPALData::Time_aggregate(
+  df_aq_b, "monthly",
+  Var_vec = "PM10", Fns_vec = "mean"
+)
+agg_df_aq_s <- ARPALData::Time_aggregate(
+  df_aq_s, "monthly",
+  Var_vec = "PM10", Fns_vec = "mean"
+)
+ts_m_monthly <- xts(agg_df_aq_m$PM10, order.by = agg_df_aq_m$Date)
+ts_b_monthly <- xts(agg_df_aq_b$PM10, order.by = agg_df_aq_b$Date)
+ts_s_monthly <- xts(agg_df_aq_s$PM10, order.by = agg_df_aq_s$Date)
+
+plot_ts_grid(
+  ts_list = list(ts_m_monthly, ts_b_monthly, ts_s_monthly),
+  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
+  ts_colors = station_colors,
+  n_row = 3,
+  ts_names = aq_station_names_full
+)
+agg_df_aq_m <- NULL
+agg_df_aq_b <- NULL
+agg_df_aq_s <- NULL
+ts_m_monthly <- xts2ts(ts_m_monthly, 12)
+ts_b_monthly <- xts2ts(ts_b_monthly, 12)
+ts_s_monthly <- xts2ts(ts_s_monthly, 12)
+```
+
+## Smoothing and decomposition
 We begin with a basic filter: the **simple moving average**, which calculates the **arithmetic average** over a time window $p$.
 
 $$
@@ -591,6 +610,41 @@ plot_filtered_ts(
 )
 ```
 
+## Autocorrelation and partial autocorrelation
+```{r}
+par(mfrow = c(1, 2))
+plot(
+  Acf(ts_m_monthly, lag.max = as.integer(length(ts_m_monthly) / 4), plot = FALSE),
+  main = paste(aq_station_names_code[1], "-", "ACF")
+)
+plot(
+  Pacf(ts_m_monthly, lag.max = as.integer(length(ts_m_monthly) / 4), plot = FALSE),
+  main = paste(aq_station_names_code[1], "-", "PACF")
+)
+par(mfrow = c(1, 1))
+```
+```{r}
+par(mfrow = c(1, 2))
+plot(
+  Acf(ts_b_monthly, lag.max = as.integer(length(ts_b_monthly) / 4), plot = FALSE),
+  main = paste(aq_station_names_code[2], "-", "ACF")
+)
+plot(
+  Pacf(ts_b_monthly, lag.max = as.integer(length(ts_b_monthly) / 4), plot = FALSE),
+  main = paste(aq_station_names_code[2], "-", "PACF")
+)
+```
+```{r}
+par(mfrow = c(1, 2))
+plot(
+  Acf(ts_s_monthly, lag.max = as.integer(length(ts_s_monthly) / 4), plot = FALSE),
+  main = paste(aq_station_names_code[3], "-", "ACF")
+)
+plot(
+  Pacf(ts_s_monthly, lag.max = as.integer(length(ts_s_monthly) / 4), plot = FALSE),
+  main = paste(aq_station_names_code[3], "-", "PACF")
+)
+```
 
 ```{r}
 # p <- 4
@@ -607,10 +661,6 @@ plot_filtered_ts(
 # Visualize the data using plots such as time series, scatter plots, and histograms.
 # Calculate summary statistics for air pollutants and meteorological variables.
 ```
-
-
-
-# Data engineering
 
 
 # Models developement
