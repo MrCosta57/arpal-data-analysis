@@ -22,7 +22,7 @@ print_table_custom <- function(
 }
 
 plot_single_ts <- function(ts, ts_name, ts_color, ylab) {
-  plot.xts(
+  print(plot.xts(
     ts,
     type = "l",
     col = ts_color,
@@ -33,7 +33,7 @@ plot_single_ts <- function(ts, ts_name, ts_color, ylab) {
     grid.col = "lightgray",
     grid.ticks.lty = 2,
     yaxis.right = FALSE
-  )
+  ))
 }
 
 plot_ts_grid <- function(ts_list, ts_names, ts_colors, ylab, n_row = 1) {
@@ -51,13 +51,11 @@ plot_ts_grid <- function(ts_list, ts_names, ts_colors, ylab, n_row = 1) {
   par(mfrow = c(n_row, n_col), mar = c(4, 4, 2, 1))
   # Loop over each time series and plot it
   for (i in seq_along(ts_list)) {
-    print(
-      plot_single_ts(
-        ts = ts_list[[i]],
-        ts_name = ts_names[i],
-        ts_color = ts_colors[i],
-        ylab = ylab
-      )
+    plot_single_ts(
+      ts = ts_list[[i]],
+      ts_name = ts_names[i],
+      ts_color = ts_colors[i],
+      ylab = ylab
     )
   }
   # Reset plotting parameters to default
@@ -140,6 +138,137 @@ plot_periodogram <- function(ts) {
   return(p)
 }
 
+plot_acf_pacf <- function(ts, main_text, do_acf = TRUE, do_pacf = TRUE, lag_max = NULL) {
+  if (do_acf & do_pacf) {
+    par(mfrow = c(1, 2))
+  }
+  if (is.null(lag_max)) {
+    lag_max <- as.integer(length(ts) / 4)
+  }
+  if (do_acf) {
+    plot(
+      Acf(ts, lag.max = lag_max, plot = FALSE),
+      main = main_text
+    )
+  }
+  if (do_pacf) {
+    plot(
+      Pacf(ts, lag.max = lag_max, plot = FALSE),
+      main = main_text
+    )
+  }
+  if (do_acf & do_pacf) {
+    par(mfrow = c(1, 1))
+  }
+}
+
+plot_ccf <- function(ts1, ts2, main_text, lag_max = NULL) {
+  if (is.null(lag_max)) {
+    lag_max <- as.integer(length(ts1) / 4)
+  }
+  plot(
+    Ccf(ts1, ts2, lag.max = lag_max, plot = FALSE),
+    main = main_text
+  )
+  grid()
+}
+
+seasonalaxis <- function(frequency, nlags, type, plot = TRUE) {
+  # List of unlabelled tick points
+  out2 <- NULL
+  # Check for non-seasonal data
+  if (length(frequency) == 1) {
+    # Compute number of seasonal periods
+    np <- trunc(nlags / frequency)
+    evenfreq <- (frequency %% 2L) == 0L
+
+    # Defaults for labelled tick points
+    if (type == "acf") {
+      out <- pretty(1:nlags)
+    } else {
+      out <- pretty(-nlags:nlags)
+    }
+
+    if (frequency == 1) {
+      if (type == "acf" && nlags <= 16) {
+        out <- 1:nlags
+      } else if (type == "ccf" && nlags <= 8) {
+        out <- (-nlags:nlags)
+      } else {
+        if (nlags <= 30 && type == "acf") {
+          out2 <- 1:nlags
+        } else if (nlags <= 15 && type == "ccf") {
+          out2 <- (-nlags:nlags)
+        }
+        if (!is.null(out2)) {
+          out <- pretty(out2)
+        }
+      }
+    } else if (frequency > 1 &&
+      ((type == "acf" && np >= 2L) || (type == "ccf" && np >= 1L))) {
+      if (type == "acf" && nlags <= 40) {
+        out <- frequency * (1:np)
+        out2 <- 1:nlags
+        # Add half-years
+        if (nlags <= 30 && evenfreq && np <= 3) {
+          out <- c(out, frequency * ((1:np) - 0.5))
+        }
+      } else if (type == "ccf" && nlags <= 20) {
+        out <- frequency * (-np:np)
+        out2 <- (-nlags:nlags)
+        # Add half-years
+        if (nlags <= 15 && evenfreq && np <= 3) {
+          out <- c(out, frequency * ((-np:np) + 0.5))
+        }
+      } else if (np < (12 - 4 * (type == "ccf"))) {
+        out <- frequency * (-np:np)
+      }
+    }
+  } else {
+    # Determine which frequency to show
+    np <- trunc(nlags / frequency)
+    frequency <- frequency[which(np <= 16)]
+    if (length(frequency) > 0L) {
+      frequency <- min(frequency)
+    } else {
+      frequency <- 1
+    }
+    out <- seasonalaxis(frequency, nlags, type, plot = FALSE)
+  }
+  if (plot) {
+    axis(1, at = out)
+    if (!is.null(out2)) {
+      axis(1, at = out2, tcl = -0.2, labels = FALSE)
+    }
+  } else {
+    return(out)
+  }
+}
+
+plot_ccf_prewhiten <- function(ccf.out, frequency) {
+  nlags <- (dim(ccf.out$lag)[1] - 1) / 2
+  ccf.out$lag[, 1, 1] <- -nlags:nlags
+  vnames <- c(deparse(substitute(x))[1L], deparse(substitute(y))[1L])
+  ccf.out$snames <- paste(vnames, collapse = " & ")
+  plot(ccf.out, ylab = "CCF", xaxt = "n")
+  seasonalaxis(frequency, nlags, type = "ccf")
+  return(invisible(ccf.out))
+}
+
+plot_different_acf_pacf <- function(ts, lag_max, station_name) {
+  diff_ts <- diff(ts)
+  diff_7_ts <- diff(ts, lag = 7)
+
+  log_ts <- ts(ts)
+  log_ts[log_ts == 0] <- 1
+  log_ts <- log(log_ts)
+
+  plot_acf_pacf(ts, station_name, lag_max = lag_max)
+  plot_acf_pacf(log_ts, paste(station_name, "-", "log"), lag_max = lag_max)
+  plot_acf_pacf(diff_ts, paste(station_name, "-", "differenced"), lag_max = lag_max)
+  plot_acf_pacf(diff(diff_ts), paste(station_name, "-", "2 times differenced"), lag_max = lag_max)
+  plot_acf_pacf(diff_7_ts, paste(station_name, "-", "differenced 7"), lag_max = lag_max)
+}
 
 plot_AQ_stations <- function(data_aq,
                              title = "Map of ARPA stations in Lombardy",

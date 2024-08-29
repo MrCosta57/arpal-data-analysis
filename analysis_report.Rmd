@@ -61,7 +61,11 @@ Comprehensive Indicator: PM10 reflects the presence of particulate pollution fro
 Health Impact: PM10 is directly linked to adverse health effects, making it a crucial measure of air quality.
 Correlations: Other pollutants (Benzene, CO, NO2, and NOx) can contribute to the levels of PM10 through primary emissions and secondary reactions, making them suitable predictor variables for analyzing variations in PM10.
 
-Data are daily but will be aggregated by month to perform a long term analysis and understand better the components. Later model on daily data will be developed to forecast the air quality in the region.
+Original air quality data are hourly and the pollutant are aggregated by the mean value, excluding the NA Values
+The original wheter data have frequency of 10 minutes and are averaged, excluding the NA Values
+More info are available on Lombardia region website
+
+For these analysis daily data are considered, but later will be aggregated by month using mean to perform a long term analysis and understand better the components. Later model on daily data will be developed to forecast the air quality in the region.
 ```{r}
 # Pre-requirements
 set.seed(123) # set pseudorandom generator for reprocucibility
@@ -74,6 +78,8 @@ for (library_name in requirements) {
 }
 lag_dplyr <- dplyr::lag
 filter_dplyr <- dplyr::filter
+daily_ts_freq <- 365.25
+monthly_ts_freq <- 12
 
 # Import user defined functions
 source("src/utils.R")
@@ -112,7 +118,7 @@ pollutant_units <- list(
 df_aq_daily <- NULL
 df_aq_stations <- NULL
 
-if (length(list.files("data/")) == 0) {
+if (length(list.files("data/", pattern = "*.rds")) == 0) {
   # Air quality data
   df_aq_daily <- get_ARPA_Lombardia_AQ_data(
     ID_station = aq_station_ids, Date_begin = start_date,
@@ -120,7 +126,7 @@ if (length(list.files("data/")) == 0) {
   )
   # Station data
   df_aq_stations <- get_ARPA_Lombardia_AQ_registry()
-  # Filter the stations
+  # Filter stations
   df_aq_stations <- df_aq_stations[df_aq_stations$IDStation %in% aq_station_ids, ]
   # Save data
   saveRDS(df_aq_daily, "data/df_aq_daily.rds")
@@ -131,7 +137,6 @@ if (length(list.files("data/")) == 0) {
 }
 ```
 
-
 start_date <- "2014-01-01"
 end_date <- "2023-12-31"
 Milano v.Senato, Bormio v.Monte Braulio, Schivenoglia v. Malpasso
@@ -139,7 +144,7 @@ aq_station_ids <- c(548, 571, 703)
 
 The stations measures different pollutants and where the columns in the dataset are all `NA` this means that the station have no sensors for measuring that pollutant in the air 
 
-# Data overview and preprocessing
+# Data overview
 ```{r echo=FALSE,out.width="50%", out.height="20%", fig.cap="caption", fig.show='hold'}
 # plot_zoning_map(
 #  title = "ARPA Lombardia zoning",
@@ -182,6 +187,19 @@ print(paste("Common pollutants among the stations:", paste(com_poll_names, colla
 ```
 
 ## Raw data
+Standard regulatory levels:
+Acceptable Level:
+50 µg/m³ (exceeded on ≤ 35 days/year).
+This level is considered acceptable for public health.
+Information Level:
+200 µg/m³.
+Exceeding this level indicates that the public should be informed about potential health risks.
+Alarm Level:
+300 µg/m³.
+This level triggers immediate public health actions, such as advising vulnerable populations to limit outdoor activities.
+Annual Average
+The annual average acceptable level is set at 30 µg/m³. This means that over a year, the average concentration should not exceed this value to protect public health effectively.
+
 **Station 548 - Milano v.Senato**
 ```{r}
 print_table_custom(
@@ -246,6 +264,28 @@ print_table_custom(
 ```
 
 ```{r}
+aq_m_pm10_by_year <- df_aq_m %>%
+  dplyr::mutate(year = format(Date, "%Y")) %>%
+  dplyr::group_by(year) %>%
+  dplyr::summarize(mean_value = mean(PM10, na.rm = TRUE))
+aq_b_pm10_by_year <- df_aq_b %>%
+  dplyr::mutate(year = format(Date, "%Y")) %>%
+  dplyr::group_by(year) %>%
+  dplyr::summarize(mean_value = mean(PM10, na.rm = TRUE))
+aq_s_pm10_by_year <- df_aq_s %>%
+  dplyr::mutate(year = format(Date, "%Y")) %>%
+  dplyr::group_by(year) %>%
+  dplyr::summarize(mean_value = mean(PM10, na.rm = TRUE))
+aq_pm10_by_year <- cbind(aq_m_pm10_by_year, aq_b_pm10_by_year$mean_value, aq_s_pm10_by_year$mean_value)
+colnames(aq_pm10_by_year) <- c("Year", aq_station_names_short)
+print_table_custom(aq_pm10_by_year, title = "Mean PM10 values by year")
+aq_m_pm10_by_year <- NULL
+aq_b_pm10_by_year <- NULL
+aq_s_pm10_by_year <- NULL
+aq_pm10_by_year <- NULL
+```
+
+```{r}
 for (i in 1:length(com_poll_names)) {
   boxplot(
     df_aq_daily[[com_poll_names[i]]] ~ as.factor(df_aq_daily$IDStation),
@@ -257,6 +297,7 @@ for (i in 1:length(com_poll_names)) {
   )
 }
 ```
+
 
 ## Time series data
 ```{r}
@@ -283,11 +324,12 @@ plot_ts_grid(
 )
 ```
 ```{r}
-ts_m <- xts2ts(ts_m, 365.25)
-ts_b <- xts2ts(ts_b, 365.25)
-ts_s <- xts2ts(ts_s, 365.25)
+ts_m <- xts2ts(ts_m, daily_ts_freq)
+ts_b <- xts2ts(ts_b, daily_ts_freq)
+ts_s <- xts2ts(ts_s, daily_ts_freq)
 ```
 
+# Preprocessing
 ## Missing values imputation
 Important to fill missing values when conisdering the daily data
 
@@ -319,37 +361,16 @@ stats_na_table
 ```
 
 ```{r fig.height=4, fig.width=10}
-imputeTS::ggplot_na_distribution(ts_m,
-  x_axis_labels = date_range,
-  title = paste(aq_station_names_code[1], "-", "missing values"),
-  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
-  color_lines = station_colors[1],
-  size_points = NA
-)
 imputeTS::ggplot_na_distribution2(ts_m,
   title = paste(aq_station_names_code[1], "-", "missing values ratio per interval"),
 )
 ```
 ```{r fig.height=4, fig.width=10}
-imputeTS::ggplot_na_distribution(ts_b,
-  x_axis_labels = date_range,
-  title = paste(aq_station_names_code[2], "-", "missing values"),
-  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
-  color_lines = station_colors[2],
-  size_points = NA
-)
 imputeTS::ggplot_na_distribution2(ts_b,
   title = paste(aq_station_names_code[2], "-", "missing values ratio per interval"),
 )
 ```
 ```{r fig.height=4, fig.width=10}
-imputeTS::ggplot_na_distribution(ts_s,
-  x_axis_labels = date_range,
-  title = paste(aq_station_names_code[3], "-", "missing values"),
-  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
-  color_lines = station_colors[3],
-  size_points = NA
-)
 imputeTS::ggplot_na_distribution2(ts_s,
   title = paste(aq_station_names_code[3], "-", "missing values ratio per interval"),
 )
@@ -465,7 +486,7 @@ tmp_ts_s <- NULL
 
 
 # Time series data analysis
-Data are aggregated by month so a long term analysis can be performed, as said. Also by aggregation in months, daily NA values are neglected
+Data are aggregated by month so a long term analysis can be performed, as said
 ```{r}
 agg_df_aq_m <- ARPALData::Time_aggregate(
   df_aq_m, "monthly",
@@ -490,22 +511,66 @@ plot_ts_grid(
   n_row = 3,
   ts_names = aq_station_names_full
 )
+
 agg_df_aq_m <- NULL
 agg_df_aq_b <- NULL
 agg_df_aq_s <- NULL
-ts_m_monthly <- xts2ts(ts_m_monthly, 12)
-ts_b_monthly <- xts2ts(ts_b_monthly, 12)
-ts_s_monthly <- xts2ts(ts_s_monthly, 12)
+ts_m_monthly <- xts2ts(ts_m_monthly, monthly_ts_freq)
+ts_b_monthly <- xts2ts(ts_b_monthly, monthly_ts_freq)
+ts_s_monthly <- xts2ts(ts_s_monthly, monthly_ts_freq)
+```
+The time series seems to be not stationary. However the time series tread and seasonality appears not clear
+
+## Autocorrelation and partial autocorrelation
+**Station 703 - Schivenoglia v. Malpasso**
+```{r}
+plot_acf_pacf(ts_m_monthly, aq_station_names_code[1])
+```
+**Station 571 - Bormio v.Monte Braulio**
+```{r}
+plot_acf_pacf(ts_b_monthly, aq_station_names_code[2])
+```
+
+**Station 703 - Schivenoglia v. Malpasso**
+```{r}
+plot_acf_pacf(ts_s_monthly, aq_station_names_code[3])
+```
+
+This is confirmed by ACF plot that exibit relevant obscillation. In particular it seems that among all the station there is a sinusoidal variation every 6 months. This is confirmed by the PACF plot that shows a significant peak at lag 6.
+
+## Monthplot
+The monthplot is a useful tool for visualizing the monthly pattern of a time series.
+
+The graph confirms what was expected: the observations exhibit a strong monthly seasonality, generally showing an increase in the winter months and a decrease in the summer month.
+```{r}
+monthplot(
+  ts_m_monthly,
+  main = paste("Monthly plot of PM10 for", aq_station_names_short[1]),
+  xlab = "Month",
+  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = "")
+)
+monthplot(
+  ts_b_monthly,
+  main = paste("Monthly plot of PM10 for", aq_station_names_short[2]),
+  xlab = "Month",
+  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = "")
+)
+monthplot(
+  ts_s_monthly,
+  main = paste("Monthly plot of PM10 for", aq_station_names_short[3]),
+  xlab = "Month",
+  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = "")
+)
 ```
 
 ## Smoothing and decomposition
-We begin with a basic filter: the **simple moving average**, which calculates the **arithmetic average** over a time window $p$.
+Basic filter: the **simple moving average**, which calculates the arithmetic average over a time window $p$.
 
 $$
 \hat{f}_t = \frac{1}{2p + 1} \sum_{i=-p}^p y_{t+i}
 $$
 
-We test different values of $p$, which plays a significant **role in determining the effect of smoothing** by considering a larger time window.
+Different values of $p$ are tested and they play a significant role in determining the effect of smoothing because larger values of $p$ result in a smoother trend estimate.
 
 
 s.window controls how rapidly the seasonal component can change. Small values allow more rapid change. Setting the seasonal window to be infinite is equivalent to forcing the seasonal component to be periodic
@@ -537,27 +602,33 @@ plot_filtered_ts(
   line_colors = filtering_colors
 )
 ```
-
 ```{r}
-monthplot(
-  ts_m_monthly,
-  main = paste("Monthly plot of PM10 for", aq_station_names_short[1]),
-  xlab = "Month",
-  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = "")
+plot_filtered_ts(
+  original_ts = ts_m_monthly,
+  filtered_ts_list = list(ma_for_seasonal(ts_m_monthly, monthly_ts_freq)),
+  main = paste(aq_station_names_code[1], "-", "moving average for seasonal data"),
+  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
+  legend_names = c("MA seasonal"),
+  line_colors = filtering_colors
 )
-monthplot(
-  ts_b_monthly,
-  main = paste("Monthly plot of PM10 for", aq_station_names_short[2]),
-  xlab = "Month",
-  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = "")
+plot_filtered_ts(
+  original_ts = ts_b_monthly,
+  filtered_ts_list = list(ma_for_seasonal(ts_b_monthly, monthly_ts_freq)),
+  main = paste(aq_station_names_code[2], "-", "moving average for seasonal data"),
+  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
+  legend_names = c("MA seasonal"),
+  line_colors = filtering_colors
 )
-monthplot(
-  ts_s_monthly,
-  main = paste("Monthly plot of PM10 for", aq_station_names_short[3]),
-  xlab = "Month",
-  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = "")
+plot_filtered_ts(
+  original_ts = ts_s_monthly,
+  filtered_ts_list = list(ma_for_seasonal(ts_s_monthly, monthly_ts_freq)),
+  main = paste(aq_station_names_code[3], "-", "moving average for seasonal data"),
+  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
+  legend_names = c("MA seasonal"),
+  line_colors = filtering_colors
 )
 ```
+
 
 ```{r}
 stl_ts_m_monthly <- stl(ts_m_monthly, s.window = "periodic", robust = TRUE)
@@ -578,102 +649,154 @@ plot(
 ```
 
 ```{r}
-Box.test(stl_ts_m_monthly$time.series[, "remainder"], lag = log(length(ts_m_monthly)), type = "Ljung-Box")
-Box.test(stl_ts_b_monthly$time.series[, "remainder"], lag = log(length(ts_b_monthly)), type = "Ljung-Box")
-Box.test(stl_ts_s_monthly$time.series[, "remainder"], lag = log(length(ts_s_monthly)), type = "Ljung-Box")
-```
+ljung_box_noise_ts_m <- Box.test(stl_ts_m_monthly$time.series[, "remainder"], type = "Ljung-Box")$p.value
+ljung_box_noise_ts_b <- Box.test(stl_ts_b_monthly$time.series[, "remainder"], type = "Ljung-Box")$p.value
+ljung_box_noise_ts_s <- Box.test(stl_ts_s_monthly$time.series[, "remainder"], type = "Ljung-Box")$p.value
+ljung_box_noise <- data.frame(
+  p_value = c(ljung_box_noise_ts_m, ljung_box_noise_ts_b, ljung_box_noise_ts_s)
+)
+rownames(ljung_box_noise) <- aq_station_names_code
+colnames(ljung_box_noise) <- "p-value"
+print_table_custom(ljung_box_noise, title = "Ljung-Box test for the noise component")
 
-```{r}
-plot_filtered_ts(
-  original_ts = ts_m_monthly,
-  filtered_ts_list = list(seasadj(stl_ts_m_monthly)),
-  main = paste(aq_station_names_code[1]),
-  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
-  legend_names = "Seasonally adjusted",
-  line_colors = filtering_colors[1]
-)
-plot_filtered_ts(
-  original_ts = ts_b_monthly,
-  filtered_ts_list = list(seasadj(stl_ts_b_monthly)),
-  main = paste(aq_station_names_code[2]),
-  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
-  legend_names = "Seasonally adjusted",
-  line_colors = filtering_colors[2]
-)
-plot_filtered_ts(
-  original_ts = ts_s_monthly,
-  filtered_ts_list = list(seasadj(stl_ts_s_monthly)),
-  main = paste(aq_station_names_code[3]),
-  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
-  legend_names = "Seasonally adjusted",
-  line_colors = filtering_colors[3]
-)
+stl_ts_m_monthly <- NULL
+stl_ts_b_monthly <- NULL
+stl_ts_s_monthly <- NULL
+ljung_box_noise_ts_m <- NULL
+ljung_box_noise_ts_b <- NULL
+ljung_box_noise_ts_s <- NULL
+ljung_box_noise <- NULL
 ```
-
-## Autocorrelation and partial autocorrelation
-```{r}
-par(mfrow = c(1, 2))
-plot(
-  Acf(ts_m_monthly, lag.max = as.integer(length(ts_m_monthly) / 4), plot = FALSE),
-  main = paste(aq_station_names_code[1], "-", "ACF")
-)
-plot(
-  Pacf(ts_m_monthly, lag.max = as.integer(length(ts_m_monthly) / 4), plot = FALSE),
-  main = paste(aq_station_names_code[1], "-", "PACF")
-)
-par(mfrow = c(1, 1))
-```
-```{r}
-par(mfrow = c(1, 2))
-plot(
-  Acf(ts_b_monthly, lag.max = as.integer(length(ts_b_monthly) / 4), plot = FALSE),
-  main = paste(aq_station_names_code[2], "-", "ACF")
-)
-plot(
-  Pacf(ts_b_monthly, lag.max = as.integer(length(ts_b_monthly) / 4), plot = FALSE),
-  main = paste(aq_station_names_code[2], "-", "PACF")
-)
-```
-```{r}
-par(mfrow = c(1, 2))
-plot(
-  Acf(ts_s_monthly, lag.max = as.integer(length(ts_s_monthly) / 4), plot = FALSE),
-  main = paste(aq_station_names_code[3], "-", "ACF")
-)
-plot(
-  Pacf(ts_s_monthly, lag.max = as.integer(length(ts_s_monthly) / 4), plot = FALSE),
-  main = paste(aq_station_names_code[3], "-", "PACF")
-)
-```
-
-```{r}
-# p <- 4
-# weights <- rep(1 / (2 * p + 1), times = 2 * p + 1) # times=2*p+1 because p a dx + p a sx +1 (that is the y_0)
-# trend <- filter(temperature.bas,
-#  sides = 2,
-#  filter = weights
-# )
-```
-```{r}
-# ALL DONE AMONGS THE AREAS
-# Clean and preprocess the data, handling missing values and outliers as necessary.
-# Perform an initial exploration of the data to understand trends, patterns, and relationships between variables (smoothing and decomposition for ex)
-# Visualize the data using plots such as time series, scatter plots, and histograms.
-# Calculate summary statistics for air pollutants and meteorological variables.
-```
+Decompositions seems white noise by statistical hypotesis test.
 
 
 # Models developement
+Now daily data are used, as anticipated
 
-## Time Searies
+## ARIMA models implementation
 ```{r}
-# ALL DONE AMONGS THE AREAS
-# stationarity, ACF, PACF, seasonality etc
-# Monthplot
-# ARIMA, box jenkins
+start_window <- "2022-01-01"
+end_window <- end_date
+start_window <- as.Date(start_window)
+end_window <- as.Date(end_window)
+
+# Train-test split
+test_set_size <- 30
+train_set_start <- start_window
+train_set_end <- as.Date(end_window) - test_set_size - 1
+test_set_start <- train_set_end + 1
+test_set_end <- end_window
+date_range_train <- seq(train_set_start, train_set_end, by = "day")
+date_range_test <- seq(test_set_start, test_set_end, by = "day")
+```
+**Station 703 - Schivenoglia v. Malpasso**
+```{r}
+ts_m_train <- window_ts_xts(ts_m, df_aq_m$Date, train_set_start, train_set_end)
+plot_single_ts(ts_m_train,
+  ts_name = aq_station_names_code[1],
+  ts_color = station_colors[1],
+  ylab = paste("PM10", pollutant_units[["PM10"]])
+)
+plot_different_acf_pacf(ts_m_train, aq_station_names_code[1], max_lag = 40)
+ts_m_train <- xts2ts(ts_m_train, daily_ts_freq)
+auto_ts_m <- auto.arima(ts_m_train, ic = "aic")
+checkresiduals(auto_ts_m)
+```
+
+**Station 571 - Bormio v.Monte Braulio**
+```{r}
+ts_b_train <- window_ts_xts(ts_b, df_aq_b$Date, train_set_start, train_set_end)
+plot_single_ts(ts_b_train,
+  ts_name = aq_station_names_code[2],
+  ts_color = station_colors[2],
+  ylab = paste("PM10", pollutant_units[["PM10"]])
+)
+plot_different_acf_pacf(ts_b_train, aq_station_names_code[2], max_lag = 40)
+ts_b_train <- xts2ts(ts_b_train, daily_ts_freq)
+auto_ts_b <- auto.arima(ts_b_train, ic = "aic")
+checkresiduals(auto_ts_b)
+```
+
+**Station 703 - Schivenoglia v. Malpasso**
+```{r}
+ts_s_train <- window_ts_xts(ts_s, df_aq_s$Date, train_set_start, train_set_end)
+plot_single_ts(ts_s_train,
+  ts_name = aq_station_names_code[3],
+  ts_color = station_colors[3],
+  ylab = paste("PM10", pollutant_units[["PM10"]])
+)
+plot_different_acf_pacf(ts_s_train, aq_station_names_code[3], max_lag = 40)
+ts_s_train <- xts2ts(ts_s_train, daily_ts_freq)
+auto_ts_s <- auto.arima(ts_s_train, ic = "aic")
+checkresiduals(auto_ts_s)
+```
+
+```{r}
+# thetahat_i/SE(thetahat_i) =t_i can be used for significance test of the parameter theta_i
+# H0: theta_i=0
+# HA: theta_i!=0
+# if |t_i| is small -> H0
+# if |t_i| is large -> HA
+
+# SIMPLE RULE FOR CHECKING THE SIGNIFICANCE:
+# n large, if H0 is true t_i behaves like N(0,1)
+# So if |t_i|< 2 (2 is similar to 1.96, and 1.96 is the normal distrib quantile 0.975)
+#--> Accept H0 if |t_i|<=2
+#--> Reject H0 if |t_i|>2
+
+# FOR DOING IT AUTOMATICALLY:
+# abs(ring.fit$coef/sqrt(diag(ring.fit$var.coef))) >2
+# tsdiag(lake.fit)
+# checkresiduals(lake.fit)
+# fitdf<-length(fit$coef)
+# Box.test(residuals(lake.fit), lag=10, fitdf=fitdf, type="Ljung")
+```
+
+## Station correlations
+```{r}
+# Correlation Analysis:
+# Investigate the relationships between air pollutants and meteorological variables.
+# Identify key factors that may contribute to poor air quality in the region.
+pw <- TSA::prewhiten(diff(ts_m_train), ts_b_train, plot = FALSE)$ccf
+# w <- prewhitening(ts_s_train, list(ar = auto_ts_s$model$phi, ma = auto_ts_s$model$theta))
+
+plot(ts_b_train ~ ts_m_train)
+
+plot_ccf_prewhiten(pw, frequency = daily_ts_freq)
+plot_ccf(u1, v1, paste(aq_station_names_code[1], "-", aq_station_names_code[2]), max_lag = 30)
+# plot_ccf(u1, w1, paste(aq_station_names_code[1], "-", aq_station_names_code[3]))
+# plot_ccf(v, w, paste(aq_station_names_code[2], "-", aq_station_names_code[3]))
+
+
+a <- xts(df_aq_m$NO2, order.by = df_aq_m$Date)
+a <- xts2ts(a, daily_ts_freq)
+a <- imputeTS::na_interpolation(a)
+Acf(a)
+Pacf(a)
+
+
+ts_no2_m_train <- window_ts_xts(a, df_aq_s$Date, train_set_start, train_set_end)
+ts_no2_m_train <- xts2ts(ts_no2_m_train, daily_ts_freq)
+plot(ts_m_train ~ ts_no2_m_train)
+m <- lm(df_aq_m$PM10 ~ df_aq_m$NO2)
+r <- resid(m)
+Acf(r)
+auto.arima(ts_no2_m_train, ic = "aic")
+
+auto.arima(ts_m_train, xreg = ts_no2_m_train, ic = "aic")
 ```
 
 ## Dynamic regression
+```{r}
+# fit.y <- Arima(y, order = c(1, 0, 0))
+# model.y <- list(ar = fit.y$model$phi, ma = fit.y$model$theta)
+# u <- prewhitening(y, model.y)
+# fit.x <- Arima(x, order = c(1, 0, 0))
+# model.x <- list(ar = fit.x$model$phi, ma = fit.x$model$theta)
+# v <- prewhitening(x, model.x)
+# ccf(u, v, col = 4)
+# grid()
+```
 ```{r}
 # try standart lin regr and multivariate TS analysis
 
@@ -683,7 +806,56 @@ plot(
 ```
 
 ## Non linear models
+```{r}
+fit <- nnetar(ts_m_train)
+r <- as.numeric(resid(fit))
+Acf(r, na.action = na.pass)
+Box.test(r, type = "Ljung-Box") # residuals seems white noise
+Acf(r^2, na.action = na.pass)
+Box.test(r^2, type = "Ljung-Box")
 
+Ccf(as.numeric(ts_m_train), r, na.action = na.pass)
+Ccf(as.numeric(ts_m_train)^2, r, na.action = na.pass)
+Ccf((r * as.numeric(ts_m_train)^2), r, na.action = na.pass)
+```
+```{r}
+## For checking some threshold models
+# lag1.plot(dflu, corr = FALSE, col = 4, pch = 20)
+#
+## Neural Network Autoregressive Model
+# fit <- nnetar(y, p = 9, size = 5)
+## Y_t=f(Y_{t-1}, ..., Y_{t-9})+Z_t where Z_t is WN(0, sigma^2) independent
+## f(Y_{t-1}, ..., Y_{t-9}) is a NN with K=5 (5 hidden unit)
+# r <- as.numeric(resid(fit))
+# acf(r, na.action = na.pass)
+# Box.test(r, type = "Ljung-Box") # residuals seems white noise
+# acf(r^2, na.action = na.pass)
+# Box.test(r^2, type = "Ljung-Box") # residuals seems white noise also if they are ^2 (check is some non lin pattern is resid^2)
+# plot(forecast(fit, h = 20, times = 10, PI = TRUE, bootstrap = FALSE))
+## bootstrap = FALSE: pick randomly the value e_t from Gaussian
+## bootstrap=TRUE: pick error from past observation
+## This is needed for the forecasting Y_t=f(X_t)+e_t
+# Watt <- APTelectric[, 1]
+# fit <- nnetar(Watt) # Model that use only the information coming from TS Y_t
+## param p is automatically derived here because it's not specified
+# nnetforecast <- forecast(fit, h = 400, PI = FALSE)
+# plot(nnetforecast)
+# Appliances <- as.numeric(APTelectric[, 2])
+#
+# fit2 <- nnetar(Watt, xreg = Appliances) # Model that use also the info of the second TS
+# print(fit2)
+# r <- as.numeric(resid(fit2))
+# acf(r, na.action = na.pass)
+# Box.test(r, type = "Ljung-Box")
+# acf(r^2, na.action = na.pass)
+# Box.test(r^2, type = "Ljung-Box")
+#
+## Check also other relations in the residuals
+# par(mfrow = c(2, 2))
+# ccf(Appliances, r, na.action = na.pass)
+# ccf(Appliances^2, r, na.action = na.pass)
+# ccf((r * Appliances^2), r, na.action = na.pass)
+```
 # Forecasting
 ```{r}
 # Compare models with metrics and with "simpler" forecasting models

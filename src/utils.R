@@ -45,13 +45,19 @@ rgb2hex_custom <- function(x) {
 }
 
 
-xts2ts <- function(xts_obj, frequency = 12) {
+xts2ts <- function(xts_obj, frequency) {
+  if (class(xts_obj)[1] == "ts") {
+    return(xts_obj)
+  }
   start_date <- c(as.integer(format(start(xts_obj), "%Y")), as.integer(format(start(xts_obj), "%m")))
   ts_obj <- ts(as.numeric(xts_obj), frequency = frequency, start = start_date)
   return(ts_obj)
 }
 
 ts2xts <- function(ts_obj, date_range) {
+  if (class(ts_obj)[1] == "xts") {
+    return(ts_obj)
+  }
   xts_obj <- xts(as.numeric(ts_obj), order.by = date_range)
   return(xts_obj)
 }
@@ -61,8 +67,6 @@ window_ts_xts <- function(ts_obj, date_range, start_date, end_date) {
   xts_obj <- window(xts_obj, start = start_date, end = end_date)
   return(xts_obj)
 }
-
-
 
 # library(xts)
 # a<-xts(rnorm(1000), order.by = seq(as.Date("2021-01-01"), by = "day", length.out = 1000), frequency = 7)
