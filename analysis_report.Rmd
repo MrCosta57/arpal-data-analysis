@@ -1,6 +1,6 @@
 ---
 title: "Assessing Air Quality in Lombardia, Italy through Time Series Analysis: Implications for Public Health and Policy"
-subtitle: "Time Searies Analysis project"
+subtitle: "Time Series Analysis project"
 author: "Giovanni Costa - 880892"
 date: "AY 2023/24"
 geometry: "left=1cm,right=2cm,top=1cm,bottom=1cm"
@@ -37,38 +37,23 @@ Sys.setlocale("LC_TIME", "en_US.UTF-8")
 # Introduction
 This project aims to evaluate the air quality in Lombardia, Italy, using a comprehensive time series analysis. The data for this study will be derived from sensors located at various stations across the region, which can be accessed via the regional website.
 
-The primary focus is to underscore the significance of air quality on public health. By analyzing the trends and patterns in air quality data over time, it's possible to identify periods of high pollution and correlate these with potential health risks. This analysis will provide valuable insights into how air quality fluctuations may impact the respiratory health of the region's inhabitants.
+The primary focus is to underscore the significance of air quality on public health. By analyzing the trends and patterns in air quality data over time, it's possible to identify periods of high pollution and correlate these with potential health risks. This analysis will provide valuable insights into how air quality fluctuations may impact the respiratory health of Lombardia's inhabitants.
 
-In particular, the following pollutants will be analized across three different stations in Lombardia placed in different areas of the region:
+Considering the data provided by the region, the following pollutants will be analyzed across three different stations placed in different areas:
 
-Benzene
-**Benzene** is a volatile organic compound (VOC) commonly used in the production of plastics, resins, and synthetic fibers, as well as in gasoline. It is released into the air through emissions from motor vehicles, industrial processes, and the evaporation of benzene-containing products. Exposure to benzene primarily occurs through inhalation and can lead to serious health effects, including bone marrow damage, which can cause blood disorders such as anemia and increase the risk of leukemia, a type of cancer.
+- **Benzene** is a volatile organic compound (VOC) commonly used in the production of plastics, resins, and synthetic fibers, as well as in gasoline. It is released into the air through emissions from motor vehicles, industrial processes, and the evaporation of benzene-containing products. Exposure to benzene primarily occurs through inhalation and can lead to serious health effects, including bone marrow damage, which can cause blood disorders such as anemia and increase the risk of leukemia, a type of cancer.
+- **Carbon Monoxide (CO)** is a colorless, odorless gas produced by incomplete combustion of carbon-containing fuels, such as gasoline, natural gas, oil, and wood. Major sources include motor vehicles, industrial processes, and residential heating systems. CO interferes with the body's ability to transport oxygen by binding to hemoglobin in the blood, forming carboxyhemoglobin. High levels of exposure can lead to symptoms such as headaches, dizziness, and even death due to oxygen deprivation.
+- **Nitrogen Dioxide (NO₂)** is a reddish-brown gas with a sharp, biting odor. It is a significant air pollutant formed primarily from the combustion of fossil fuels in vehicles, power plants, and industrial processes. NO₂ can irritate the respiratory system, exacerbate asthma, and reduce lung function. It also contributes to the formation of ground-level ozone and fine particulate matter, which can have further adverse effects on human health and the environment.
+- **Nitrogen Oxides (NOₓ)** encompass a group of gases, including nitrogen dioxide (NO₂) and nitrogen monoxide (NO), produced during combustion processes, particularly at high temperatures. Major sources include motor vehicles, power plants, and industrial facilities. NOₓ gases can cause respiratory problems, contribute to the formation of smog and acid rain, and lead to the secondary formation of fine particulate matter (PM2.5), all of which can have severe health and environmental impacts.
+- **Particulate Matter 10 (PM10)** refers to airborne particles with a diameter of 10 micrometers or less. These particles can originate from a variety of sources, including construction sites, road dust, industrial emissions, and combustion processes. PM10 can be inhaled into the respiratory system, leading to health issues such as respiratory infections, lung inflammation, and aggravation of existing heart and lung diseases. Long-term exposure can decrease lung function and increase mortality from cardiovascular and respiratory diseases.
 
-Carbon Monoxide (CO)
-**Carbon Monoxide (CO)** is a colorless, odorless gas produced by incomplete combustion of carbon-containing fuels, such as gasoline, natural gas, oil, and wood. Major sources include motor vehicles, industrial processes, and residential heating systems. CO interferes with the body's ability to transport oxygen by binding to hemoglobin in the blood, forming carboxyhemoglobin. High levels of exposure can lead to symptoms such as headaches, dizziness, and even death due to oxygen deprivation.
+In particular, PM10 is selected for the main part of this analysis because it serves as a comprehensive indicator of particulate pollution from a wide range of sources, such as traffic emissions, industrial processes, and the secondary formation of particles from gaseous pollutants. Its direct link to adverse health effects, including respiratory and cardiovascular diseases, makes PM10 a crucial measure of air quality. Additionally, other pollutants like Benzene, CO, NO₂, and NOₓ can contribute to PM10 levels through both primary emissions and secondary reactions, making them valuable predictor variables for analyzing fluctuations in PM10 concentrations.
 
-Nitrogen Dioxide (NO₂)
-**Nitrogen Dioxide (NO₂)** is a reddish-brown gas with a sharp, biting odor. It is a significant air pollutant formed primarily from the combustion of fossil fuels in vehicles, power plants, and industrial processes. NO₂ can irritate the respiratory system, exacerbate asthma, and reduce lung function. It also contributes to the formation of ground-level ozone and fine particulate matter, which can have further adverse effects on human health and the environment.
+For this study, daily data are considered, followed by aggregation into monthly averages to facilitate a long-term analysis and provide a clearer understanding of the underlying trends. Subsequently, forecasting models will be developed using the daily data to predict air quality in the region.
 
-Nitrogen Oxides (NOₓ)
-**Nitrogen Oxides (NOₓ)** encompass a group of gases, including nitrogen dioxide (NO₂) and nitrogen monoxide (NO), produced during combustion processes, particularly at high temperatures. Major sources include motor vehicles, power plants, and industrial facilities. NOₓ gases can cause respiratory problems, contribute to the formation of smog and acid rain, and lead to the secondary formation of fine particulate matter (PM2.5), all of which can have severe health and environmental impacts.
-
-Particulate Matter 10 (PM10)
-**Particulate Matter 10 (PM10)** refers to airborne particles with a diameter of 10 micrometers or less. These particles can originate from a variety of sources, including construction sites, road dust, industrial emissions, and combustion processes. PM10 can be inhaled into the respiratory system, leading to health issues such as respiratory infections, lung inflammation, and aggravation of existing heart and lung diseases. Long-term exposure can decrease lung function and increase mortality from cardiovascular and respiratory diseases.
-
-Selected PM10
-Comprehensive Indicator: PM10 reflects the presence of particulate pollution from various sources, including traffic emissions, industrial processes, and secondary formation from gaseous pollutants.
-Health Impact: PM10 is directly linked to adverse health effects, making it a crucial measure of air quality.
-Correlations: Other pollutants (Benzene, CO, NO2, and NOx) can contribute to the levels of PM10 through primary emissions and secondary reactions, making them suitable predictor variables for analyzing variations in PM10.
-
-Original air quality data are hourly and the pollutant are aggregated by the mean value, excluding the NA Values
-The original wheter data have frequency of 10 minutes and are averaged, excluding the NA Values
-More info are available on Lombardia region website
-
-For these analysis daily data are considered, but later will be aggregated by month using mean to perform a long term analysis and understand better the components. Later model on daily data will be developed to forecast the air quality in the region.
 ```{r}
 # Pre-requirements
-set.seed(123) # set pseudorandom generator for reprocucibility
+set.seed(123) # set pseudorandom generator for reproducibility
 requirements <- c("dplyr", "ggplot2", "kableExtra", "ARPALData", "imputeTS", "xts", "forecast", "TSA")
 for (library_name in requirements) {
   if (!require(library_name, character.only = TRUE, exclude = if (library_name == "dplyr") c("lag", "filter") else NULL)) {
@@ -81,7 +66,7 @@ filter_dplyr <- dplyr::filter
 daily_ts_freq <- 365.25
 monthly_ts_freq <- 12
 
-# Import user defined functions
+# Import user-defined functions
 source("src/utils.R")
 source("src/plotting.R")
 source("src/smoothing.R")
@@ -92,6 +77,15 @@ source("src/forecasting.R")
 ```
 
 # Dataset description
+The air quality dataset utilized is composed of daily observations of Benzene, CO, NO2, NOx, and PM10 coming from 3 different stations placed in different positions:
+1. Station 548 - Milano v.Senato refers to the metropolitan area of Milan
+1. Station 571 - Bormio v.Monte Braulio is located in the mountain zone
+1. Station 703 - Schivenoglia v.Malpasso is placed in the rural plain of Lombardia
+
+The analysis is restricted to a period that goes from 2014-01-01 to 2023-12-31 and the original air quality data were hourly observations aggregated to daily using the mean and excluding NA values. More information can be found in the ARPALData library manual ^[https://cran.r-project.org/web/packages/ARPALData/index.html].
+
+A dataset with detailed information about the monitoring stations is also available. It includes the sensor ID, the pollutant measured by each sensor, as well as the location, altitude, and the start and stop dates of station operation. Since the stations measure different pollutants, columns in the dataset with all `NA` values indicate that the station does not have sensors for measuring that particular pollutant in the air.
+
 ```{r}
 # Data retrieval
 start_date <- "2014-01-01"
@@ -106,7 +100,7 @@ aq_station_names_full <- c("Station 548 - Milano v.Senato", "Station 571 - Bormi
 station_colors <- c("steelblue", "darkorange", "#009E73")
 filtering_colors <- c("red", "blue", "green")
 
-# pollutant : unit of measure mapping
+# pollutant: unit of measure mapping
 pollutant_units <- list(
   "Benzene" = "µg/m³",
   "CO" = "mg/m³",
@@ -136,16 +130,7 @@ if (length(list.files("data/", pattern = "*.rds")) == 0) {
   df_aq_stations <- readRDS("data/df_aq_stations.rds")
 }
 ```
-
-start_date <- "2014-01-01"
-end_date <- "2023-12-31"
-Milano v.Senato, Bormio v.Monte Braulio, Schivenoglia v. Malpasso
-aq_station_ids <- c(548, 571, 703)
-
-The stations measures different pollutants and where the columns in the dataset are all `NA` this means that the station have no sensors for measuring that pollutant in the air 
-
-# Data overview
-```{r echo=FALSE,out.width="50%", out.height="20%", fig.cap="caption", fig.show='hold'}
+```{r echo=FALSE,out.width="50%", out.height="20%", fig.show='hold', fig.cap="Stations zoning information"}
 # plot_zoning_map(
 #  title = "ARPA Lombardia zoning",
 #  line_type = 1,
@@ -157,12 +142,6 @@ The stations measures different pollutants and where the columns in the dataset 
 knitr::include_graphics(c("assets/images/zoning.png", "assets/images/stations_map.png"))
 ```
 ```{r}
-print.data.frame(head(df_aq_daily, 3))
-```
-```{r}
-print.data.frame(head(df_aq_stations, 3))
-```
-```{r}
 missing_dates <- check_missing_dates(df_aq_daily, start_date, end_date, "day")
 print(paste("The number of missing dates in the dataset from",
   start_date, "to", end_date, "is:", length(missing_dates),
@@ -170,9 +149,6 @@ print(paste("The number of missing dates in the dataset from",
 ))
 missing_dates <- NULL
 ```
-
-
-**Common pollutants among the stations**
 ```{r}
 df_aq_m <- df_aq_daily %>% filter_dplyr(IDStation == 548)
 df_aq_b <- df_aq_daily %>% filter_dplyr(IDStation == 571)
@@ -186,22 +162,11 @@ com_poll_names <- find_common_pollutants(
 print(paste("Common pollutants among the stations:", paste(com_poll_names, collapse = ", ")))
 ```
 
+# Data overview
 ## Raw data
-Standard regulatory levels:
-Acceptable Level:
-50 µg/m³ (exceeded on ≤ 35 days/year).
-This level is considered acceptable for public health.
-Information Level:
-200 µg/m³.
-Exceeding this level indicates that the public should be informed about potential health risks.
-Alarm Level:
-300 µg/m³.
-This level triggers immediate public health actions, such as advising vulnerable populations to limit outdoor activities.
-Annual Average
-The annual average acceptable level is set at 30 µg/m³. This means that over a year, the average concentration should not exceed this value to protect public health effectively.
-
-**Station 548 - Milano v.Senato**
+As previously mentioned, the air quality stations dataset provides details on the locations, sensors, and their operational status. Below is the table for the station located in Milan, while similar information is available for other stations, which may monitor different types of pollutants.
 ```{r}
+# Station 548 - Milano v.Senato
 print_table_custom(
   df_aq_stations %>%
     filter_dplyr(IDStation == 548) %>%
@@ -215,24 +180,37 @@ print_table_custom(
 )
 ```
 ```{r}
+# Station 571 - Bormio v.Monte Braulio
+# print_table_custom(df_aq_stations %>%
+#  filter_dplyr(IDStation == 571) %>%
+#  select(c(
+#    IDSensor, Pollutant, Province, City,
+#    Latitude, Longitude, Altitude, DateStart, DateStop
+#  )) %>%
+#  distinct() %>%
+#  arrange(Pollutant), title = paste(aq_station_names_full[2], "information"))
+```
+```{r}
+# Station 703 - Schivenoglia v. Malpasso
+# print_table_custom(df_aq_stations %>%
+#  filter_dplyr(IDStation == 703) %>%
+#  select(c(
+#    IDSensor, Pollutant, Province, City,
+#    Latitude, Longitude, Altitude, DateStart, DateStop
+#  )) %>%
+#  distinct() %>%
+#  arrange(Pollutant), title = paste(aq_station_names_full[3], "information"))
+```
+
+However, it is more insightful to focus on the air quality summary tables for the different stations. First, the number of missing values within the selected 10-year daily interval is significant, and these gaps will be addressed through imputation. Additionally, while the selected pollutants generally show a small standard deviation (based on the range between the 1st and 3rd quartiles), some pollutants, such as PM10 and NOx, exhibit maximum values that are considerably higher than the 3rd quartile. 
+
+```{r}
 print_table_custom(
   df_aq_m %>%
     select(c(-IDStation, -NameStation, -Date)),
   is_summary = TRUE, title = paste(aq_station_names_full[1], "daily data statistics"),
   highlight_rows = com_poll_names
 )
-```
-
-**Station 571 - Bormio v.Monte Braulio**
-```{r}
-print_table_custom(df_aq_stations %>%
-  filter_dplyr(IDStation == 571) %>%
-  select(c(
-    IDSensor, Pollutant, Province, City,
-    Latitude, Longitude, Altitude, DateStart, DateStop
-  )) %>%
-  distinct() %>%
-  arrange(Pollutant), title = paste(aq_station_names_full[2], "information"))
 ```
 ```{r}
 print_table_custom(
@@ -242,18 +220,6 @@ print_table_custom(
   highlight_rows = com_poll_names
 )
 ```
-
-**Station 703 - Schivenoglia v. Malpasso**
-```{r}
-print_table_custom(df_aq_stations %>%
-  filter_dplyr(IDStation == 703) %>%
-  select(c(
-    IDSensor, Pollutant, Province, City,
-    Latitude, Longitude, Altitude, DateStart, DateStop
-  )) %>%
-  distinct() %>%
-  arrange(Pollutant), title = paste(aq_station_names_full[3], "information"))
-```
 ```{r}
 print_table_custom(
   df_aq_s %>%
@@ -262,6 +228,31 @@ print_table_custom(
   highlight_rows = com_poll_names
 )
 ```
+
+The data distribution of the PM10 can be better highlighted with a boxplot: the median values of the Milan station and Schivenoglia station are quite similar and all the stations present observations very distant from the others (in particular station 703). Indeed, PM10 concentrations can be higher in rural areas compared to urban metropolitan areas for several reasons. Agricultural activities, such as harvesting and livestock operations, contribute to elevated PM10 levels by generating bioaerosols rich in plant and animal matter. Additionally, rural dust often contains higher concentrations of crustal metals, exacerbated by drier climates and open spaces. Furthermore, rural areas typically experience more stable atmospheric conditions, leading to reduced dispersion of particulates compared to the more unstable, windier conditions often found in urban environments due to intense heat islands.
+```{r}
+# for (i in 1:length(com_poll_names)) {
+#  boxplot(
+#    df_aq_daily[[com_poll_names[i]]] ~ as.factor(df_aq_daily$IDStation),
+#    main = "Boxplot of common pollutants among the stations",
+#    xlab = "Station ID",
+#    ylab = paste0(com_poll_names[i], " (", pollutant_units[[com_poll_names[i]]], ")"),
+#    col = station_colors,
+#    las = 2
+#  )
+# }
+boxplot(
+  df_aq_daily[["PM10"]] ~ as.factor(df_aq_daily$IDStation),
+  main = "Boxplot of PM10 among the stations",
+  xlab = "Station ID",
+  ylab = paste0("PM10", " (", pollutant_units[["PM10"]], ")"),
+  col = station_colors,
+  las = 2
+)
+```
+
+Standard regulatory levels for PM10 are as follows: the **Acceptable Level** is 50 µg/m³, which can be exceeded on up to 35 days per year without health concerns. The **Information Level** is set at 200 µg/m³, triggering public notifications about potential health risks. The **Alarm Level** is 300 µg/m³, prompting immediate public health actions, such as advising vulnerable groups to limit outdoor activities. Additionally, the **Annual Average** acceptable level is 40 µg/m³, ensuring that the yearly average concentration does not exceed this value to protect public health.
+Fortunately, as indicated in this table, the annual average concentration of Particulate Matter 10 remains only slightly above the limit across the years.
 
 ```{r}
 aq_m_pm10_by_year <- df_aq_m %>%
@@ -285,21 +276,10 @@ aq_s_pm10_by_year <- NULL
 aq_pm10_by_year <- NULL
 ```
 
-```{r}
-for (i in 1:length(com_poll_names)) {
-  boxplot(
-    df_aq_daily[[com_poll_names[i]]] ~ as.factor(df_aq_daily$IDStation),
-    main = "Boxplot of common pollutants among the stations",
-    xlab = "Station ID",
-    ylab = paste0(com_poll_names[i], " (", pollutant_units[[com_poll_names[i]]], ")"),
-    col = station_colors,
-    las = 2
-  )
-}
-```
-
 
 ## Time series data
+Currently, the data are analyzed as time series rather than as raw values, and further considerations will be based on this interpretation. The plot displaying time series from all stations confirms previous observations about data distribution: the Milan station generally records higher PM10 values, whereas the Bormio station reports the lowest levels, and the Schivenoglia station shows numerous peaks.
+
 ```{r}
 ts_m <- xts(df_aq_m$PM10, order.by = df_aq_m$Date)
 ts_b <- xts(df_aq_b$PM10, order.by = df_aq_b$Date)
@@ -314,6 +294,9 @@ plot_3_ts(
   legend_names = aq_station_names_full
 )
 ```
+
+When the time series are plotted individually, their patterns become clearer. Each series exhibits variability and is evidently non-stationary, with indications of seasonal patterns across all stations.
+
 ```{r fig.height=8, fig.width=10}
 plot_ts_grid(
   ts_list = list(ts_m, ts_b, ts_s),
@@ -331,15 +314,12 @@ ts_s <- xts2ts(ts_s, daily_ts_freq)
 
 # Preprocessing
 ## Missing values imputation
-Important to fill missing values when conisdering the daily data
+As previously noted, the data contain many missing values, and time series require consistent spacing without gaps. The following statistics provide insight into these missing values:
+- "Number of Gaps" indicates the count of NA gaps, which are sequences of one or more consecutive missing values.
+- "Average Gap Size" represents the average length of these consecutive NA gaps.
+- "Longest NA Gap" shows the longest sequence of consecutive missing values in the time series.
+- "Most Frequent Gap Size" identifies the most commonly occurring length of missing value sequences.
 
-"Length of time series" - Number of observations in the time series (including NAs)
-"Number of Missing Values" - Number of missing values in the time series
-"Number of Gaps" - Number of NA gaps (consisting of one or more consecutive NAs) in the time series
-"Average Gap Size" - Average size of consecutive NAs for the NA gaps in the time series
-"Percentage of Missing Values" - Percentage of missing values in the time series
-"Longest NA gap" - Longest series of consecutive missing values (NAs in a row) in the time series
-"Most frequent gap size" - Most frequent occurring series of missing values in the time series
 ```{r}
 stats_na_ts_m <- imputeTS::statsNA(ts_m, print_only = FALSE)
 stats_na_ts_b <- imputeTS::statsNA(ts_b, print_only = FALSE)
@@ -360,21 +340,23 @@ rownames(stats_na_table) <- aq_station_names_code
 stats_na_table
 ```
 
-```{r fig.height=4, fig.width=10}
-imputeTS::ggplot_na_distribution2(ts_m,
-  title = paste(aq_station_names_code[1], "-", "missing values ratio per interval"),
-)
+Fortunately, the most frequent gap length is one, and the average gap size is relatively small, likely resulting from occasional sensor malfunctions. This suggests that simple imputation techniques should be reasonably accurate and close to the actual values.
+
+```{r}
+# imputeTS::ggplot_na_distribution2(ts_m,
+#  title = paste(aq_station_names_code[1], "-", "missing values ratio per interval"),
+# )
+# imputeTS::ggplot_na_distribution2(ts_b,
+#  title = paste(aq_station_names_code[2], "-", "missing values ratio per interval"),
+# )
+# imputeTS::ggplot_na_distribution2(ts_s,
+#  title = paste(aq_station_names_code[3], "-", "missing values ratio per interval"),
+# )
 ```
-```{r fig.height=4, fig.width=10}
-imputeTS::ggplot_na_distribution2(ts_b,
-  title = paste(aq_station_names_code[2], "-", "missing values ratio per interval"),
-)
-```
-```{r fig.height=4, fig.width=10}
-imputeTS::ggplot_na_distribution2(ts_s,
-  title = paste(aq_station_names_code[3], "-", "missing values ratio per interval"),
-)
-```
+
+To address missing values in the time series, linear interpolation is used. This method assumes that missing values can be estimated by drawing a straight line between the known values on either side. For time series data, this means using the timestamps and values of the adjacent non-missing points to calculate the missing values.
+
+As shown the the following plots, the values imputed among all the stations seem coherent.
 
 ```{r fig.height=4, fig.width=8}
 ts_m_imputed <- imputeTS::na_interpolation(ts_m)
@@ -432,6 +414,8 @@ print(
 ```
 
 ## Outliers detection
+The previously identified outliers are also evident in the time series data, particularly as prominent peaks at the stations. These outliers have been left unaltered to preserve the integrity and semantics of the data.
+
 ```{r}
 outliers_ts_m <- tsoutliers(ts_m)
 outliers_ts_b <- tsoutliers(ts_b)
@@ -483,7 +467,6 @@ tmp_ts_m <- NULL
 tmp_ts_b <- NULL
 tmp_ts_s <- NULL
 ```
-
 
 # Time series data analysis
 Data are aggregated by month so a long term analysis can be performed, as said
@@ -860,9 +843,6 @@ Ccf((r * as.numeric(ts_m_train)^2), r, na.action = na.pass)
 ```{r}
 # Compare models with metrics and with "simpler" forecasting models
 ```
-"Ammonia"        "Arsenic"        "Benzene"        "Benzo_a_pyrene" "BlackCarbon"   
-"Cadmium"        "CO"             "Lead"           "Nikel"          "NO2"            "NOx"            "Ozone"          "PM_tot"        
-"PM10"           "PM2.5"          "Sulfur_dioxide"
 
 
 # Conclusions
@@ -870,5 +850,3 @@ Ccf((r * as.numeric(ts_m_train)^2), r, na.action = na.pass)
 # Discussion and further perspectives.
 # The discussion section should recall the main results and point to new research questions, that appeared from your work, or possible limitations.
 ```
-
-
