@@ -78,11 +78,12 @@ source("src/forecasting.R")
 
 # Dataset description
 The air quality dataset utilized is composed of daily observations of Benzene, CO, NO2, NOx, and PM10 coming from 3 different stations placed in different positions:
+
 1. Station 548 - Milano v.Senato refers to the metropolitan area of Milan
 1. Station 571 - Bormio v.Monte Braulio is located in the mountain zone
 1. Station 703 - Schivenoglia v.Malpasso is placed in the rural plain of Lombardia
 
-The analysis is restricted to a period that goes from 2014-01-01 to 2023-12-31 and the original air quality data were hourly observations aggregated to daily using the mean and excluding NA values. More information can be found in the ARPALData library manual ^[https://cran.r-project.org/web/packages/ARPALData/index.html].
+The analysis covers the period from January 1, 2014, to December 31, 2023. The original air quality data, which were recorded hourly, were aggregated to daily values by calculating the mean and excluding NA values. For additional details, refer to the ARPALData library manual ^[https://cran.r-project.org/web/packages/ARPALData/index.html].
 
 A dataset with detailed information about the monitoring stations is also available. It includes the sensor ID, the pollutant measured by each sensor, as well as the location, altitude, and the start and stop dates of station operation. Since the stations measure different pollutants, columns in the dataset with all `NA` values indicate that the station does not have sensors for measuring that particular pollutant in the air.
 
@@ -295,7 +296,7 @@ plot_3_ts(
 )
 ```
 
-When the time series are plotted individually, their patterns become clearer. Each series exhibits variability and is evidently non-stationary, with indications of seasonal patterns across all stations.
+When the time series are plotted individually, their patterns become clearer. Each series exhibits variability and is evidently non-stationary, with indications of some seasonal patterns across all stations.
 
 ```{r fig.height=8, fig.width=10}
 plot_ts_grid(
@@ -315,6 +316,7 @@ ts_s <- xts2ts(ts_s, daily_ts_freq)
 # Preprocessing
 ## Missing values imputation
 As previously noted, the data contain many missing values, and time series require consistent spacing without gaps. The following statistics provide insight into these missing values:
+
 - "Number of Gaps" indicates the count of NA gaps, which are sequences of one or more consecutive missing values.
 - "Average Gap Size" represents the average length of these consecutive NA gaps.
 - "Longest NA Gap" shows the longest sequence of consecutive missing values in the time series.
@@ -469,7 +471,8 @@ tmp_ts_s <- NULL
 ```
 
 # Time series data analysis
-Data are aggregated by month so a long term analysis can be performed, as said
+In this section data daily data are averaged across the months for performing a long-term analysis. Due to the lower number of observations, now the time series appear more clear. The time series are evidently not stationary however, just by plotting the monthly values, the trend and the seasonal pattern don't emerge much.
+
 ```{r}
 agg_df_aq_m <- ARPALData::Time_aggregate(
   df_aq_m, "monthly",
@@ -502,29 +505,24 @@ ts_m_monthly <- xts2ts(ts_m_monthly, monthly_ts_freq)
 ts_b_monthly <- xts2ts(ts_b_monthly, monthly_ts_freq)
 ts_s_monthly <- xts2ts(ts_s_monthly, monthly_ts_freq)
 ```
-The time series seems to be not stationary. However the time series tread and seasonality appears not clear
 
 ## Autocorrelation and partial autocorrelation
-**Station 703 - Schivenoglia v. Malpasso**
+Autocorrelation (ACF) and partial autocorrelation (PACF) function plots provide additional insights into the data. The ACF plots reveal a sinusoidal pattern across all stations, with a pronounced peak every six lags, suggesting a recurring pattern approximately every six months. The PACF plots also show spikes around this period, indicating the presence of significant information during these intervals. Additionally, the analysis confirms with reasonable confidence that the time series is non-stationary.
+
 ```{r}
 plot_acf_pacf(ts_m_monthly, aq_station_names_code[1])
 ```
-**Station 571 - Bormio v.Monte Braulio**
 ```{r}
 plot_acf_pacf(ts_b_monthly, aq_station_names_code[2])
 ```
-
-**Station 703 - Schivenoglia v. Malpasso**
 ```{r}
 plot_acf_pacf(ts_s_monthly, aq_station_names_code[3])
 ```
 
-This is confirmed by ACF plot that exibit relevant obscillation. In particular it seems that among all the station there is a sinusoidal variation every 6 months. This is confirmed by the PACF plot that shows a significant peak at lag 6.
-
 ## Monthplot
-The monthplot is a useful tool for visualizing the monthly pattern of a time series.
+The monthplot function is a helpful tool for visualizing and analyzing the monthly patterns in a time series. It displays the average values for each month, making it easier to identify any seasonal trends.
+The resulting graph confirms the expected pattern: the observations show a pronounced monthly seasonality, with higher values typically occurring during the winter months and lower values during the summer. Additionally, the variability throughout the year is significant across all stations, indicating that the seasonal fluctuations are consistent yet varied in magnitude.
 
-The graph confirms what was expected: the observations exhibit a strong monthly seasonality, generally showing an increase in the winter months and a decrease in the summer month.
 ```{r}
 monthplot(
   ts_m_monthly,
@@ -547,45 +545,29 @@ monthplot(
 ```
 
 ## Smoothing and decomposition
-Basic filter: the **simple moving average**, which calculates the arithmetic average over a time window $p$.
+To better understand the trend component of the time series, this section employs smoothing techniques to estimate the underlying trend. Later, the time series from different stations will be decomposed using Seasonal and Trend decomposition using Loess (STL) to further isolate and highlight the trend, seasonal, and residual components.
 
+A widely used and straightforward method for smoothing is the **simple moving average** filter, which computes the arithmetic mean over a centered time window of size \(2p + 1\). The filtered trend estimate at time \(t\) is given by:
 $$
 \hat{f}_t = \frac{1}{2p + 1} \sum_{i=-p}^p y_{t+i}
 $$
+The choice of the window size \(p\) is crucial as it directly influences the degree of smoothing: larger values of \(p\) result in a smoother trend, while smaller values retain more of the original variability. Various values of \(p\) are tested to explore different levels of smoothing, each with a specific purpose:
 
-Different values of $p$ are tested and they play a significant role in determining the effect of smoothing because larger values of $p$ result in a smoother trend estimate.
+- **\(p = 3\):** A smaller window that applies minimal smoothing, allowing short-term fluctuations to be visible while still reducing noise.
+- **\(p = 6\):** This value is chosen to remove the seasonal effect identified in the Auto-Correlation Function (ACF), particularly smoothing out variations that span over a half-year period.
+- **\(p = 12\):** A larger window size aimed at providing more significant smoothing, potentially eliminating yearly patterns and offering a clearer view of long-term trends.
 
+In addition, a moving average filter for the seasonal data is tried to estimate the trend, given that the monthly time series exhibits a significant seasonal component.
 
-s.window controls how rapidly the seasonal component can change. Small values allow more rapid change. Setting the seasonal window to be infinite is equivalent to forcing the seasonal component to be periodic
-
-If you think the seasonal pattern is constant through time, you should set this parameter to a big value, so that you use the entire data to perform your analysis. If on the other way round, the seasonal pattern evolves quickly, reduce this parameter to use only the recent data so that your analysis is not affected by old seasonal pattern that are not relevant anymore
 ```{r}
 plot_filtered_ts(
   original_ts = ts_m_monthly,
-  filtered_ts_list = list(simple_ma(ts_m_monthly, p = 4), simple_ma(ts_m_monthly, p = 8), simple_ma(ts_m_monthly, p = 12)),
+  filtered_ts_list = list(simple_ma(ts_m_monthly, p = 3), simple_ma(ts_m_monthly, p = 6), simple_ma(ts_m_monthly, p = 12)),
   main = paste(aq_station_names_code[1], "-", "simple moving average filter"),
   ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
-  legend_names = c("p = 4", "p = 8", "p = 12"),
+  legend_names = c("p = 3", "p = 6", "p = 12"),
   line_colors = filtering_colors
 )
-plot_filtered_ts(
-  original_ts = ts_b_monthly,
-  filtered_ts_list = list(simple_ma(ts_b_monthly, p = 4), simple_ma(ts_b_monthly, p = 8), simple_ma(ts_b_monthly, p = 12)),
-  main = paste(aq_station_names_code[2], "-", "simple moving average filter"),
-  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
-  legend_names = c("p = 4", "p = 8", "p = 12"),
-  line_colors = filtering_colors
-)
-plot_filtered_ts(
-  original_ts = ts_s_monthly,
-  filtered_ts_list = list(simple_ma(ts_s_monthly, p = 4), simple_ma(ts_s_monthly, p = 8), simple_ma(ts_s_monthly, p = 12)),
-  main = paste(aq_station_names_code[3], "-", "simple moving average filter"),
-  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
-  legend_names = c("p = 4", "p = 8", "p = 12"),
-  line_colors = filtering_colors
-)
-```
-```{r}
 plot_filtered_ts(
   original_ts = ts_m_monthly,
   filtered_ts_list = list(ma_for_seasonal(ts_m_monthly, monthly_ts_freq)),
@@ -594,12 +576,32 @@ plot_filtered_ts(
   legend_names = c("MA seasonal"),
   line_colors = filtering_colors
 )
+```
+```{r}
+plot_filtered_ts(
+  original_ts = ts_b_monthly,
+  filtered_ts_list = list(simple_ma(ts_b_monthly, p = 3), simple_ma(ts_b_monthly, p = 6), simple_ma(ts_b_monthly, p = 12)),
+  main = paste(aq_station_names_code[2], "-", "simple moving average filter"),
+  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
+  legend_names = c("p = 3", "p = 6", "p = 12"),
+  line_colors = filtering_colors
+)
 plot_filtered_ts(
   original_ts = ts_b_monthly,
   filtered_ts_list = list(ma_for_seasonal(ts_b_monthly, monthly_ts_freq)),
   main = paste(aq_station_names_code[2], "-", "moving average for seasonal data"),
   ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
   legend_names = c("MA seasonal"),
+  line_colors = filtering_colors
+)
+```
+```{r}
+plot_filtered_ts(
+  original_ts = ts_s_monthly,
+  filtered_ts_list = list(simple_ma(ts_s_monthly, p = 3), simple_ma(ts_s_monthly, p = 6), simple_ma(ts_s_monthly, p = 12)),
+  main = paste(aq_station_names_code[3], "-", "simple moving average filter"),
+  ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""),
+  legend_names = c("p = 3", "p = 6", "p = 12"),
   line_colors = filtering_colors
 )
 plot_filtered_ts(
@@ -612,6 +614,9 @@ plot_filtered_ts(
 )
 ```
 
+Overall, the estimated trend appears to be slowly decreasing. These data indicates also that during the COVID-19 restrictions in Italy from 2020 to 2022, the average PM10 levels did not significantly decrease. In fact, there were periods with increased PM10 values, such as at Station 571 in Bormio in 2021. This suggests that sources of particulate emissions unrelated to mobility, such as industrial activities or other local sources, played a substantial role in sustaining PM10 concentrations during this time.
+
+To further inspect the behavior of the time series, STL (Seasonal and Trend decomposition using Loess) decomposition is applied. Given the previously observed anomalies, the robust version of the algorithm is used to mitigate their impact. STL also offers flexibility in defining the rate of change for the seasonal component. Since the seasonal pattern appears consistent over time, the seasonal window is set to "periodic" to ensure that the entire dataset is utilized for a comprehensive seasonal analysis.
 
 ```{r}
 stl_ts_m_monthly <- stl(ts_m_monthly, s.window = "periodic", robust = TRUE)
@@ -630,6 +635,9 @@ plot(
   main = paste(aq_station_names_code[3], "-", "PM10 - STL decomposition")
 )
 ```
+All stations exhibit a strong seasonal component, with an overall decreasing trend. However, Station 548 shows a notable exception, as it experienced significant peaks in PM10 levels at the end of 2021 and throughout 2022.
+
+The Ljung-Box test supports the validity of the decomposition, as it does not suggest rejecting the null hypothesis that the residuals are white noise for all stations.
 
 ```{r}
 ljung_box_noise_ts_m <- Box.test(stl_ts_m_monthly$time.series[, "remainder"], type = "Ljung-Box")$p.value
@@ -653,8 +661,10 @@ ljung_box_noise <- NULL
 Decompositions seems white noise by statistical hypotesis test.
 
 
-# Models developement
-Now daily data are used, as anticipated
+# Models development
+As previously mentioned, this section of the analysis focuses on daily data to develop forecasting models. Given the need to predict future PM10 values for implementing preventive health measures, a short-term analysis is essential.
+
+To simplify visualization and focus on recent data, the time series for this part of the study is limited to the period from January 1, 2022, to December 31, 2023. For an accurate evaluation, it is crucial to avoid using forecast data as training data. Therefore, the time series is divided into training and test sets, with the test period spanning from December 1, 2023, to the end of the period. A one-month test set is selected to assess how the model performs with a relatively long forecast horizon.
 
 ## ARIMA models implementation
 ```{r}
@@ -680,7 +690,7 @@ plot_single_ts(ts_m_train,
   ts_color = station_colors[1],
   ylab = paste("PM10", pollutant_units[["PM10"]])
 )
-plot_different_acf_pacf(ts_m_train, aq_station_names_code[1], max_lag = 40)
+plot_different_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
 ts_m_train <- xts2ts(ts_m_train, daily_ts_freq)
 auto_ts_m <- auto.arima(ts_m_train, ic = "aic")
 checkresiduals(auto_ts_m)
@@ -694,7 +704,7 @@ plot_single_ts(ts_b_train,
   ts_color = station_colors[2],
   ylab = paste("PM10", pollutant_units[["PM10"]])
 )
-plot_different_acf_pacf(ts_b_train, aq_station_names_code[2], max_lag = 40)
+plot_different_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40)
 ts_b_train <- xts2ts(ts_b_train, daily_ts_freq)
 auto_ts_b <- auto.arima(ts_b_train, ic = "aic")
 checkresiduals(auto_ts_b)
@@ -708,7 +718,7 @@ plot_single_ts(ts_s_train,
   ts_color = station_colors[3],
   ylab = paste("PM10", pollutant_units[["PM10"]])
 )
-plot_different_acf_pacf(ts_s_train, aq_station_names_code[3], max_lag = 40)
+plot_different_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40)
 ts_s_train <- xts2ts(ts_s_train, daily_ts_freq)
 auto_ts_s <- auto.arima(ts_s_train, ic = "aic")
 checkresiduals(auto_ts_s)
@@ -746,7 +756,7 @@ pw <- TSA::prewhiten(diff(ts_m_train), ts_b_train, plot = FALSE)$ccf
 plot(ts_b_train ~ ts_m_train)
 
 plot_ccf_prewhiten(pw, frequency = daily_ts_freq)
-plot_ccf(u1, v1, paste(aq_station_names_code[1], "-", aq_station_names_code[2]), max_lag = 30)
+# plot_ccf(u1, v1, paste(aq_station_names_code[1], "-", aq_station_names_code[2]), lag_max = 30)
 # plot_ccf(u1, w1, paste(aq_station_names_code[1], "-", aq_station_names_code[3]))
 # plot_ccf(v, w, paste(aq_station_names_code[2], "-", aq_station_names_code[3]))
 
