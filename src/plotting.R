@@ -108,58 +108,36 @@ plot_filtered_ts <- function(original_ts, filtered_ts_list, line_colors, legend_
   )
 }
 
-plot_periodogram <- function(ts) {
-  # Compute the periodogram
-  pgram <- TSA::periodogram(ts, plot = FALSE)
-  # Frequencies and spectrum
-  frequencies <- pgram$freq * length(ts)
-  spectrum <- pgram$spec / length(ts)
-
-  # Define labels for the x-axis
-  x_labels <- c(1, 2, 4, 6, 12, 26, 52, 104)
-  x_labels_text <- c(
-    "Annual (1)", "Semiannual (2)", "Quarterly (4)",
-    "Bimonthly (6)", "Monthly (12)", "Biweekly (26)",
-    "Weekly (52)", "Semiweekly (104)"
+plot_train_test_ts <- function(train_ts, test_ts, line_colors, legend_names, main, ylab) {
+  plot(index(train_ts), coredata(train_ts),
+    main = main, ylab = ylab, col = line_colors[1], type = "l", xlab = "Time"
   )
 
-  # Create a data frame for plotting
-  df <- data.frame(frequencies = frequencies, spectrum = spectrum)
+  lines(index(test_ts), coredata(test_ts), col = line_colors[2], type = "l")
 
-  # Plot using ggplot2
-  p <- ggplot(df, aes(x = frequencies, y = spectrum)) +
-    geom_step(color = "purple") +
-    scale_x_log10(breaks = x_labels, labels = x_labels_text) +
-    scale_y_continuous(labels = scientific) +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
-    labs(x = "Frequency", y = "Variance", title = "Periodogram")
-
-  return(p)
+  legend("topright",
+    legend = c("Train", "Test"),
+    lty = 1, lwd = 1, col = line_colors
+  )
 }
 
-plot_acf_pacf <- function(ts, main_text, do_acf = TRUE, do_pacf = TRUE, lag_max = NULL) {
-  if (do_acf & do_pacf) {
-    par(mfrow = c(1, 2))
-  }
+
+plot_acf_pacf <- function(ts, main_text, lag_max = NULL) {
+  par(mfrow = c(1, 2))
+  # Set outer margins to make room for the title
+  par(oma = c(0, 0, 2, 0))
+  # Set inner margins for the plots
+  par(mar = c(5, 4, 1, 2))
+
   if (is.null(lag_max)) {
     lag_max <- as.integer(length(ts) / 4)
   }
-  if (do_acf) {
-    plot(
-      Acf(ts, lag.max = lag_max, plot = FALSE),
-      main = main_text
-    )
-  }
-  if (do_pacf) {
-    plot(
-      Pacf(ts, lag.max = lag_max, plot = FALSE),
-      main = main_text
-    )
-  }
-  if (do_acf & do_pacf) {
-    par(mfrow = c(1, 1))
-  }
+  Acf(ts, lag.max = lag_max, main = "")
+  Pacf(ts, lag.max = lag_max, main = "")
+  mtext(main_text, outer = TRUE, cex = 1.5)
+  par(oma = c(0, 0, 0, 0))
+  par(mar = c(0, 0, 0, 0))
+  par(mfrow = c(1, 1))
 }
 
 plot_ccf <- function(ts1, ts2, main_text, lag_max = NULL) {
@@ -168,106 +146,84 @@ plot_ccf <- function(ts1, ts2, main_text, lag_max = NULL) {
   }
   plot(
     Ccf(ts1, ts2, lag.max = lag_max, plot = FALSE),
+    ylab = "CCF",
     main = main_text
   )
   grid()
 }
 
-seasonalaxis <- function(frequency, nlags, type, plot = TRUE) {
-  # List of unlabelled tick points
-  out2 <- NULL
-  # Check for non-seasonal data
-  if (length(frequency) == 1) {
-    # Compute number of seasonal periods
-    np <- trunc(nlags / frequency)
-    evenfreq <- (frequency %% 2L) == 0L
-
-    # Defaults for labelled tick points
-    if (type == "acf") {
-      out <- pretty(1:nlags)
-    } else {
-      out <- pretty(-nlags:nlags)
-    }
-
-    if (frequency == 1) {
-      if (type == "acf" && nlags <= 16) {
-        out <- 1:nlags
-      } else if (type == "ccf" && nlags <= 8) {
-        out <- (-nlags:nlags)
-      } else {
-        if (nlags <= 30 && type == "acf") {
-          out2 <- 1:nlags
-        } else if (nlags <= 15 && type == "ccf") {
-          out2 <- (-nlags:nlags)
-        }
-        if (!is.null(out2)) {
-          out <- pretty(out2)
-        }
-      }
-    } else if (frequency > 1 &&
-      ((type == "acf" && np >= 2L) || (type == "ccf" && np >= 1L))) {
-      if (type == "acf" && nlags <= 40) {
-        out <- frequency * (1:np)
-        out2 <- 1:nlags
-        # Add half-years
-        if (nlags <= 30 && evenfreq && np <= 3) {
-          out <- c(out, frequency * ((1:np) - 0.5))
-        }
-      } else if (type == "ccf" && nlags <= 20) {
-        out <- frequency * (-np:np)
-        out2 <- (-nlags:nlags)
-        # Add half-years
-        if (nlags <= 15 && evenfreq && np <= 3) {
-          out <- c(out, frequency * ((-np:np) + 0.5))
-        }
-      } else if (np < (12 - 4 * (type == "ccf"))) {
-        out <- frequency * (-np:np)
-      }
-    }
-  } else {
-    # Determine which frequency to show
-    np <- trunc(nlags / frequency)
-    frequency <- frequency[which(np <= 16)]
-    if (length(frequency) > 0L) {
-      frequency <- min(frequency)
-    } else {
-      frequency <- 1
-    }
-    out <- seasonalaxis(frequency, nlags, type, plot = FALSE)
+plot_log_arima_acf_pacf <- function(ts, station_name, lag_max = NULL, ylab = "PM10") {
+  if (is.null(lag_max)) {
+    lag_max <- as.integer(length(ts) / 4)
   }
-  if (plot) {
-    axis(1, at = out)
-    if (!is.null(out2)) {
-      axis(1, at = out2, tcl = -0.2, labels = FALSE)
-    }
-  } else {
-    return(out)
-  }
-}
+  layout_matrix <- matrix(c(1, 1, 2, 3), nrow = 2, ncol = 2, byrow = TRUE)
+  par(oma = c(0, 0, 2, 0))
+  par(mar = c(5, 4, 1, 2))
 
-plot_ccf_prewhiten <- function(ccf.out, frequency) {
-  nlags <- (dim(ccf.out$lag)[1] - 1) / 2
-  ccf.out$lag[, 1, 1] <- -nlags:nlags
-  vnames <- c(deparse(substitute(x))[1L], deparse(substitute(y))[1L])
-  ccf.out$snames <- paste(vnames, collapse = " & ")
-  plot(ccf.out, ylab = "CCF", xaxt = "n")
-  seasonalaxis(frequency, nlags, type = "ccf")
-  return(invisible(ccf.out))
-}
-
-plot_different_acf_pacf <- function(ts, lag_max, station_name) {
-  diff_ts <- diff(ts)
-  diff_7_ts <- diff(ts, lag = 7)
-
+  layout(layout_matrix)
   log_ts <- ts(ts)
   log_ts[log_ts == 0] <- 1
   log_ts <- log(log_ts)
+  plot(log_ts, xlab = "Time", ylab = paste0("log(", ylab, ")"))
+  Acf(ts, lag.max = lag_max, main = "")
+  Pacf(ts, lag.max = lag_max, main = "")
+  mtext(paste(station_name, "-", "log"), outer = TRUE, cex = 1.5)
+  par(oma = c(0, 0, 0, 0))
+  par(mar = c(0, 0, 0, 0))
+  par(mfrow = c(1, 1))
+}
 
-  plot_acf_pacf(ts, station_name, lag_max = lag_max)
-  plot_acf_pacf(log_ts, paste(station_name, "-", "log"), lag_max = lag_max)
-  plot_acf_pacf(diff_ts, paste(station_name, "-", "differenced"), lag_max = lag_max)
-  plot_acf_pacf(diff(diff_ts), paste(station_name, "-", "2 times differenced"), lag_max = lag_max)
-  plot_acf_pacf(diff_7_ts, paste(station_name, "-", "differenced 7"), lag_max = lag_max)
+plot_diff_arima_acf_pacf <- function(ts, station_name, lag_max = NULL, ylab = "PM10", lag = 1, difference = 1) {
+  if (is.null(lag_max)) {
+    lag_max <- as.integer(length(ts) / 4)
+  }
+  layout_matrix <- matrix(c(1, 1, 2, 3), nrow = 2, ncol = 2, byrow = TRUE)
+  par(oma = c(0, 0, 2, 0))
+  par(mar = c(5, 4, 1, 2))
+
+  layout(layout_matrix)
+  diff_ts <- diff(ts, differences = difference, lag = lag)
+  plot(diff_ts, xlab = "Time", ylab = paste0("diff(", ylab, ")"))
+  Acf(diff_ts, lag.max = lag_max, main = "")
+  Pacf(diff_ts, lag.max = lag_max, main = "")
+  mtext(paste0(station_name, " - ", "difference ", difference, " lag ", lag), outer = TRUE, cex = 1.5)
+  par(oma = c(0, 0, 0, 0))
+  par(mar = c(0, 0, 0, 0))
+  par(mfrow = c(1, 1))
+}
+
+
+plot_pollutant_XY_lin <- function(x, y, xlab, ylab, station_name, unit_measure_x, unit_measure_y) {
+  plot(y ~ x,
+    xlab = paste0(xlab, " (", unit_measure_x, ")"),
+    ylab = paste0(ylab, " (", unit_measure_y, ")"),
+    main = paste(station_name, "-", ylab, "vs", xlab),
+    col = "steelblue"
+  )
+  fit <- lm(y ~ x)
+  abline(fit, col = "darkorange", lwd = 2)
+  print(summary(fit))
+  checkresiduals(resid(fit))
+}
+
+plot_nn_residuals <- function(nn_model, model_name, ts, lag_max = NULL) {
+  if (is.null(lag_max)) {
+    lag_max <- as.integer(length(ts) / 4)
+  }
+  par(mfrow = c(1, 2))
+  r <- resid(nn_model)
+  Acf(r, main = paste(model_name, "residuals"), lag.max = lag_max)
+  print(Box.test(r, type = "Ljung-Box")) # residuals seems white noise
+  Acf(r^2, main = paste(model_name, "residuals^2"), lag.max = lag_max)
+  print(Box.test(r^2, type = "Ljung-Box"))
+  par(mfrow = c(1, 1))
+
+  layout_matrix <- matrix(c(1, 2, 3, 3), nrow = 2, ncol = 2, byrow = TRUE)
+  layout(layout_matrix)
+  Ccf(ts, r, main = paste(model_name, "residuals - time series"), lag.max = lag_max)
+  Ccf(ts^2, r, main = paste(model_name, "residuals - time series^2"), lag.max = lag_max)
+  Ccf(r * ts^2, r, main = paste(model_name, "residuals - residuals*time series^2"), lag.max = lag_max)
+  par(mfrow = c(1, 1))
 }
 
 plot_AQ_stations <- function(data_aq,

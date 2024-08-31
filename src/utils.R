@@ -68,6 +68,54 @@ window_ts_xts <- function(ts_obj, date_range, start_date, end_date) {
   return(xts_obj)
 }
 
+test_arima_coefficients <- function(arima_model) {
+  # thetahat_i/SE(thetahat_i)=t_i
+  # can be used for significance test of the parameter theta_i
+
+  # H0: theta_i=0
+  # HA: theta_i!=0
+  # if |t_i| is small -> H0
+  # if |t_i| is large -> HA
+
+  # SIMPLE RULE FOR CHECKING THE SIGNIFICANCE:
+  # n large, if H0 is true t_i behaves like N(0,1)
+  # So if |t_i|< 2 (2 is similar to 1.96, and 1.96 is the normal distribution quantile 0.975)
+  #--> Accept H0 if |t_i|<=2
+  #--> Reject H0 if |t_i|>2
+  result <- abs(arima_model$coef / sqrt(diag(arima_model$var.coef))) > 2
+  return(result)
+}
+
+prewhitening <- function(x, model, d = NULL) {
+  # Arguments
+  #
+  # x	a univariate time series
+  #
+  # model	  a list with component ar and/or ma giving
+  #         the AR and MA coefficients respectively.
+  #         d in the list is the order of differencing
+
+  if (!is.list(model)) {
+    stop("'model' must be list")
+  }
+  p <- length(model$ar)
+  q <- length(model$ma)
+  d <- length(model$d)
+
+  if (d > 0) {
+    x <- diff(x, differences = d)
+  }
+  if (p > 0) {
+    x <- filter(x, c(1, -model$ar), method = "convolution", sides = 1L)
+    x[seq_along(model$ar)] <- 0 # we pad the missing values
+  }
+  if (q > 0) {
+    x <- filter(x, -model$ma, method = "recursive")
+  }
+  as.ts(x)
+}
+
+
 # library(xts)
 # a<-xts(rnorm(1000), order.by = seq(as.Date("2021-01-01"), by = "day", length.out = 1000), frequency = 7)
 # plot(a)

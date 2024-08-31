@@ -54,7 +54,7 @@ For this study, daily data are considered, followed by aggregation into monthly 
 ```{r}
 # Pre-requirements
 set.seed(123) # set pseudorandom generator for reproducibility
-requirements <- c("dplyr", "ggplot2", "kableExtra", "ARPALData", "imputeTS", "xts", "forecast", "TSA")
+requirements <- c("dplyr", "ggplot2", "kableExtra", "ARPALData", "imputeTS", "xts", "forecast")
 for (library_name in requirements) {
   if (!require(library_name, character.only = TRUE, exclude = if (library_name == "dplyr") c("lag", "filter") else NULL)) {
     install.packages(library_name, repos = "https://cloud.r-project.org")
@@ -70,7 +70,7 @@ monthly_ts_freq <- 12
 source("src/utils.R")
 source("src/plotting.R")
 source("src/smoothing.R")
-source("src/forecasting.R")
+source("src/evaluation.R")
 
 # library(styler)
 # style_file("analysis_report.Rmd")
@@ -664,7 +664,9 @@ Decompositions seems white noise by statistical hypotesis test.
 # Models development
 As previously mentioned, this section of the analysis focuses on daily data to develop forecasting models. Given the need to predict future PM10 values for implementing preventive health measures, a short-term analysis is essential.
 
-To simplify visualization and focus on recent data, the time series for this part of the study is limited to the period from January 1, 2022, to December 31, 2023. For an accurate evaluation, it is crucial to avoid using forecast data as training data. Therefore, the time series is divided into training and test sets, with the test period spanning from December 1, 2023, to the end of the period. A one-month test set is selected to assess how the model performs with a relatively long forecast horizon.
+To simplify visualization and focus on recent data, the time series for this part of the study is limited to the period from January 1, 2022, to December 31, 2023. As shown previously, the choice of selecting a time window at the end of the COVID-19 emergency period in Italy don't influence much the PM10 values pattern
+
+For an accurate evaluation, it is crucial to avoid using forecast data as training data. Therefore, the time series is divided into training and test sets, with the test period spanning from December 1, 2023, to the end of the period. A one-month test set is selected to assess how the model performs with a relatively long forecast horizon.
 
 ## ARIMA models implementation
 ```{r}
@@ -682,135 +684,307 @@ test_set_end <- end_window
 date_range_train <- seq(train_set_start, train_set_end, by = "day")
 date_range_test <- seq(test_set_start, test_set_end, by = "day")
 ```
-**Station 703 - Schivenoglia v. Malpasso**
+
+**Station 548 - Milano v.Senato**
 ```{r}
+ts_m_train_test <- window_ts_xts(ts_m, df_aq_m$Date, train_set_start, test_set_end)
 ts_m_train <- window_ts_xts(ts_m, df_aq_m$Date, train_set_start, train_set_end)
-plot_single_ts(ts_m_train,
-  ts_name = aq_station_names_code[1],
-  ts_color = station_colors[1],
+ts_m_test <- window_ts_xts(ts_m, df_aq_m$Date, test_set_start, test_set_end)
+plot_train_test_ts(ts_m_train, ts_m_test,
+  c("steelblue", "darkorange"),
+  main = paste(aq_station_names_code[1]),
   ylab = paste("PM10", pollutant_units[["PM10"]])
 )
-plot_different_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
 ts_m_train <- xts2ts(ts_m_train, daily_ts_freq)
-auto_ts_m <- auto.arima(ts_m_train, ic = "aic")
+
+plot_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
+plot_log_arima_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
+```
+
+Considering the plots can be clearly observed that time series is not stationary. In particular by cheching the ACF plot the lags decay very slow. 
+Also if logarithmic transformation is applied to time series for stabilizing the variance, the situation is more or less invariate.
+The lag is show until 40 lags, because after more than a month of inspection of daily correlation the lags can be not significant.
+
+```{r}
+plot_diff_arima_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
+plot_diff_arima_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40, lag = 7)
+```
+
+Differencing time series instead seems to be very benefician indeed data seems now more alliged to stationary assumption.
+Differencing by lag 7 instead seems to be useless and introduce some forced seasonal pattern to data. 
+TODO: MODIFY Nevertheless, applying differencing to eliminate potential periodic factors might be impractical and risky in the case of daily observations. This is because we are not considering time domains such as months or weeks where a certain type of pattern is expected over a relatively large time period. The difference between days in two different years is highly variable, influenced by factors like weather or the day of the week, making it uninformative and challenging to utilize effectively.
+So difficult to see or predict seasonality
+
+Given that the differenced time series ACF plot show some more evident spikes until lag 5 and PACF display relatively fast decay, an ARIMA model with order (0, 1, 5) is fitted. The residuals are checked to ensure they are white noise, and the model is compared with an automatic ARIMA model selection.
+
+```{r}
+ma5_ts_m <- Arima(ts_m_train, order = c(0, 1, 5))
+checkresiduals(ma5_ts_m)
+```
+
+```{r}
+auto_ts_m <- auto.arima(ts_m_train, ic = "aicc")
 checkresiduals(auto_ts_m)
 ```
 
+```{r}
+ic_ts_m <- get_arima_IC(arima_models = list(ma5_ts_m, auto_ts_m), suffixes = list("", "[auto]"))
+print(ic_ts_m)
+```
+
+TODO: Describe results
+The same procedure is applied also for the other stations, by differencing one time the time series to make them more stationary and inspecting the plot for guess the best ARIMA model for them.
+In the end also for the others stations are compared with automatic ARIMA model selection. In both cases in the other stations residuals seems to be coherent with the assumptions
+
 **Station 571 - Bormio v.Monte Braulio**
 ```{r}
+ts_b_train_test <- window_ts_xts(ts_b, df_aq_b$Date, train_set_start, test_set_end)
 ts_b_train <- window_ts_xts(ts_b, df_aq_b$Date, train_set_start, train_set_end)
-plot_single_ts(ts_b_train,
-  ts_name = aq_station_names_code[2],
-  ts_color = station_colors[2],
+ts_b_test <- window_ts_xts(ts_b, df_aq_b$Date, test_set_start, test_set_end)
+plot_train_test_ts(ts_b_train, ts_b_test,
+  c("steelblue", "darkorange"),
+  main = paste(aq_station_names_code[2]),
   ylab = paste("PM10", pollutant_units[["PM10"]])
 )
-plot_different_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40)
 ts_b_train <- xts2ts(ts_b_train, daily_ts_freq)
-auto_ts_b <- auto.arima(ts_b_train, ic = "aic")
-checkresiduals(auto_ts_b)
+
+plot_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40)
+```
+```{r}
+plot_diff_arima_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40)
+```
+```{r}
+ar1_ma2_ts_b <- Arima(ts_b_train, order = c(1, 1, 2))
+# checkresiduals(ar1_ma2_ts_b)
+```
+```{r}
+auto_ts_b <- auto.arima(ts_b_train, ic = "aicc")
+# checkresiduals(auto_ts_b)
+```
+
+```{r}
+ic_ts_b <- get_arima_IC(arima_models = list(ar1_ma2_ts_b, auto_ts_b), suffixes = list("", "[auto]"))
+print(ic_ts_b)
 ```
 
 **Station 703 - Schivenoglia v. Malpasso**
 ```{r}
+ts_s_train_test <- window_ts_xts(ts_s, df_aq_s$Date, train_set_start, test_set_end)
 ts_s_train <- window_ts_xts(ts_s, df_aq_s$Date, train_set_start, train_set_end)
-plot_single_ts(ts_s_train,
-  ts_name = aq_station_names_code[3],
-  ts_color = station_colors[3],
+ts_s_test <- window_ts_xts(ts_s, df_aq_s$Date, test_set_start, test_set_end)
+plot_train_test_ts(ts_s_train, ts_s_test,
+  c("steelblue", "darkorange"),
+  main = paste(aq_station_names_code[3]),
   ylab = paste("PM10", pollutant_units[["PM10"]])
 )
-plot_different_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40)
 ts_s_train <- xts2ts(ts_s_train, daily_ts_freq)
-auto_ts_s <- auto.arima(ts_s_train, ic = "aic")
-checkresiduals(auto_ts_s)
+
+plot_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40)
+```
+```{r}
+plot_diff_arima_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40)
+```
+```{r}
+ar1_ma3_ts_s <- Arima(ts_s_train, order = c(1, 1, 3))
+# checkresiduals(ar1_ma3_ts_s)
+```
+```{r}
+auto_ts_s <- auto.arima(ts_s_train, ic = "aicc")
+# checkresiduals(auto_ts_s)
 ```
 
 ```{r}
-# thetahat_i/SE(thetahat_i) =t_i can be used for significance test of the parameter theta_i
-# H0: theta_i=0
-# HA: theta_i!=0
-# if |t_i| is small -> H0
-# if |t_i| is large -> HA
-
-# SIMPLE RULE FOR CHECKING THE SIGNIFICANCE:
-# n large, if H0 is true t_i behaves like N(0,1)
-# So if |t_i|< 2 (2 is similar to 1.96, and 1.96 is the normal distrib quantile 0.975)
-#--> Accept H0 if |t_i|<=2
-#--> Reject H0 if |t_i|>2
-
-# FOR DOING IT AUTOMATICALLY:
-# abs(ring.fit$coef/sqrt(diag(ring.fit$var.coef))) >2
-# tsdiag(lake.fit)
-# checkresiduals(lake.fit)
-# fitdf<-length(fit$coef)
-# Box.test(residuals(lake.fit), lag=10, fitdf=fitdf, type="Ljung")
+ic_ts_s <- get_arima_IC(arima_models = list(ar1_ma3_ts_s, auto_ts_s), suffixes = list("", "[auto]"))
+print(ic_ts_s)
 ```
 
-## Station correlations
-```{r}
-# Correlation Analysis:
-# Investigate the relationships between air pollutants and meteorological variables.
-# Identify key factors that may contribute to poor air quality in the region.
-pw <- TSA::prewhiten(diff(ts_m_train), ts_b_train, plot = FALSE)$ccf
-# w <- prewhitening(ts_s_train, list(ar = auto_ts_s$model$phi, ma = auto_ts_s$model$theta))
-
-plot(ts_b_train ~ ts_m_train)
-
-plot_ccf_prewhiten(pw, frequency = daily_ts_freq)
-# plot_ccf(u1, v1, paste(aq_station_names_code[1], "-", aq_station_names_code[2]), lag_max = 30)
-# plot_ccf(u1, w1, paste(aq_station_names_code[1], "-", aq_station_names_code[3]))
-# plot_ccf(v, w, paste(aq_station_names_code[2], "-", aq_station_names_code[3]))
-
-
-a <- xts(df_aq_m$NO2, order.by = df_aq_m$Date)
-a <- xts2ts(a, daily_ts_freq)
-a <- imputeTS::na_interpolation(a)
-Acf(a)
-Pacf(a)
-
-
-ts_no2_m_train <- window_ts_xts(a, df_aq_s$Date, train_set_start, train_set_end)
-ts_no2_m_train <- xts2ts(ts_no2_m_train, daily_ts_freq)
-plot(ts_m_train ~ ts_no2_m_train)
-m <- lm(df_aq_m$PM10 ~ df_aq_m$NO2)
-r <- resid(m)
-Acf(r)
-auto.arima(ts_no2_m_train, ic = "aic")
-
-auto.arima(ts_m_train, xreg = ts_no2_m_train, ic = "aic")
-```
+In all the stations model fitted using automatic criteria selection have lower value of AICc so these one are selected.
+Notice that the manual selected model in some stations (e.i station 548 and 571) have lower Bic value so they appear better is a more parsimonious model is desidered.
 
 ## Dynamic regression
-```{r}
-# fit.y <- Arima(y, order = c(1, 0, 0))
-# model.y <- list(ar = fit.y$model$phi, ma = fit.y$model$theta)
-# u <- prewhitening(y, model.y)
-# fit.x <- Arima(x, order = c(1, 0, 0))
-# model.x <- list(ar = fit.x$model$phi, ma = fit.x$model$theta)
-# v <- prewhitening(x, model.x)
-# ccf(u, v, col = 4)
-# grid()
-```
-```{r}
-# try standart lin regr and multivariate TS analysis
 
-# Correlation Analysis:
-# Investigate the relationships between air pollutants and meteorological variables.
-# Identify key factors that may contribute to poor air quality in the region.
+NO2, N0x and PM10 have the same unit of measure
+CO has a different unit of measure
+
+Nitrogen Dioxide (NO2): NO2 is a significant precursor to particulate matter formation. It can react in the atmosphere to form secondary particles, contributing to PM10 levels.
+Nitrogen Oxides (NOx): Similar to NO2, NOx (which includes both NO and NO2) plays a crucial role in the formation of secondary particulate matter. These compounds are primarily emitted from combustion processes, such as those in vehicles and industrial facilities, and are directly linked to PM10 concentrations.
+Carbon Monoxide (CO): While CO is primarily a gas, it can contribute indirectly to PM10 levels through its role in atmospheric chemical reactions that lead to the formation of secondary pollutants, including particulate matter.
+Benzene, while a hazardous air pollutant, is less directly related to PM10 formation compared to the other three pollutants.
+
+```{r}
+no2_ts_m <- xts(df_aq_m$NO2, order.by = df_aq_m$Date)
+no2_ts_b <- xts(df_aq_b$NO2, order.by = df_aq_b$Date)
+no2_ts_s <- xts(df_aq_s$NO2, order.by = df_aq_s$Date)
+no2_ts_m_train <- window_ts_xts(no2_ts_m, df_aq_m$Date, train_set_start, train_set_end)
+no2_ts_b_train <- window_ts_xts(no2_ts_b, df_aq_b$Date, train_set_start, train_set_end)
+no2_ts_s_train <- window_ts_xts(no2_ts_s, df_aq_s$Date, train_set_start, train_set_end)
+no2_ts_m_train <- xts2ts(imputeTS::na_interpolation(no2_ts_m_train), daily_ts_freq)
+no2_ts_b_train <- xts2ts(imputeTS::na_interpolation(no2_ts_b_train), daily_ts_freq)
+no2_ts_s_train <- xts2ts(imputeTS::na_interpolation(no2_ts_s_train), daily_ts_freq)
+
+# co_ts_m <- xts(df_aq_m$CO, order.by = df_aq_m$Date)
+# co_ts_b <- xts(df_aq_b$CO, order.by = df_aq_b$Date)
+# co_ts_s <- xts(df_aq_s$CO, order.by = df_aq_s$Date)
+# co_ts_m_train <- window_ts_xts(co_ts_m, df_aq_m$Date, train_set_start, train_set_end)
+# co_ts_b_train <- window_ts_xts(co_ts_b, df_aq_b$Date, train_set_start, train_set_end)
+# co_ts_s_train <- window_ts_xts(co_ts_s, df_aq_s$Date, train_set_start, train_set_end)
+## Convert milligrams per cubic meter to micrograms per cubic meter
+# co_ts_m_train <- xts2ts(imputeTS::na_interpolation(co_ts_m_train), daily_ts_freq) * 1000
+# co_ts_b_train <- xts2ts(imputeTS::na_interpolation(co_ts_b_train), daily_ts_freq) * 1000
+# co_ts_s_train <- xts2ts(imputeTS::na_interpolation(co_ts_s_train), daily_ts_freq) * 1000
+
+# nox_ts_m <- xts(df_aq_m$NOx, order.by = df_aq_m$Date)
+# nox_ts_b <- xts(df_aq_b$NOx, order.by = df_aq_b$Date)
+# nox_ts_s <- xts(df_aq_s$NOx, order.by = df_aq_s$Date)
+# nox_ts_m_train <- window_ts_xts(nox_ts_m, df_aq_m$Date, train_set_start, train_set_end)
+# nox_ts_b_train <- window_ts_xts(nox_ts_b, df_aq_b$Date, train_set_start, train_set_end)
+# nox_ts_s_train <- window_ts_xts(nox_ts_s, df_aq_s$Date, train_set_start, train_set_end)
+# nox_ts_m_train <- xts2ts(imputeTS::na_interpolation(nox_ts_m_train), daily_ts_freq)
+# nox_ts_b_train <- xts2ts(imputeTS::na_interpolation(nox_ts_b_train), daily_ts_freq)
+# nox_ts_s_train <- xts2ts(imputeTS::na_interpolation(nox_ts_s_train), daily_ts_freq)
 ```
+
+It seems that between NO2 and PM10 there's a linear relationship. This is confirmed by the linear regression model where the predictor appear strongly significant. 
+The residuals however are clearly violating the white noise assumption. The same procedure is applied to the other stations and the results are very similar.
+```{r}
+plot_pollutant_XY_lin(
+  x = no2_ts_m_train,
+  y = ts_m_train,
+  station_name = aq_station_names_code[1],
+  unit_measure_x = pollutant_units[["NO2"]],
+  unit_measure_y = pollutant_units[["PM10"]],
+  xlab = "NO2",
+  ylab = "PM10"
+)
+# plot_pollutant_XY_lin(
+#  x = no2_ts_s_train,
+#  y = ts_s_train,
+#  station_name = aq_station_names_code[3],
+#  unit_measure_x = pollutant_units[["NO2"]],
+#  unit_measure_y = pollutant_units[["PM10"]],
+#  xlab = "NO2",
+#  ylab = "PM10"
+# )
+# plot_pollutant_XY_lin(
+#  x = no2_ts_b_train,
+#  y = ts_b_train,
+#  station_name = aq_station_names_code[2],
+#  unit_measure_x = pollutant_units[["NO2"]],
+#  unit_measure_y = pollutant_units[["PM10"]],
+#  xlab = "NO2",
+#  ylab = "PM10"
+# )
+```
+
+By analyzing the relation between PM10 and CO and PM10 and NOx the situation is similar.
+```{r}
+# plot_pollutant_XY_lin(
+#  x = co_ts_m_train,
+#  y = ts_m_train,
+#  station_name = aq_station_names_code[1],
+#  unit_measure_x = pollutant_units[["PM10"]],
+#  unit_measure_y = pollutant_units[["PM10"]],
+#  xlab = "CO",
+#  ylab = "PM10"
+# )
+# plot_pollutant_XY_lin(
+#  x = co_ts_b_train,
+#  y = ts_b_train,
+#  station_name = aq_station_names_code[2],
+#  unit_measure_x = pollutant_units[["PM10"]],
+#  unit_measure_y = pollutant_units[["PM10"]],
+#  xlab = "CO",
+#  ylab = "PM10"
+# )
+# plot_pollutant_XY_lin(
+#  x = co_ts_s_train,
+#  y = ts_s_train,
+#  station_name = aq_station_names_code[3],
+#  unit_measure_x = pollutant_units[["PM10"]],
+#  unit_measure_y = pollutant_units[["PM10"]],
+#  xlab = "CO",
+#  ylab = "PM10"
+# )
+```
+```{r}
+# plot_pollutant_XY_lin(
+#  x = nox_ts_m_train,
+#  y = ts_m_train,
+#  station_name = aq_station_names_code[1],
+#  unit_measure_x = pollutant_units[["NOx"]],
+#  unit_measure_y = pollutant_units[["PM10"]],
+#  xlab = "NOx",
+#  ylab = "PM10"
+# )
+# plot_pollutant_XY_lin(
+#  x = nox_ts_b_train,
+#  y = ts_b_train,
+#  station_name = aq_station_names_code[2],
+#  unit_measure_x = pollutant_units[["NOx"]],
+#  unit_measure_y = pollutant_units[["PM10"]],
+#  xlab = "NOx",
+#  ylab = "PM10"
+# )
+# plot_pollutant_XY_lin(
+#  x = nox_ts_s_train,
+#  y = ts_s_train,
+#  station_name = aq_station_names_code[3],
+#  unit_measure_x = pollutant_units[["NOx"]],
+#  unit_measure_y = pollutant_units[["PM10"]],
+#  xlab = "NOx",
+#  ylab = "PM10"
+# )
+```
+
+
+It's decided to fit a dynamic regression model to the time series data, considering just NO2 because it seems to be the most related predictor.
+The model is estimated using the auto.arima function, which automatically selects the best ARIMA model based on the corrected Akaike Information Criterion (AICc). The residuals are then checked for white noise using the checkresiduals function.
+
+**Station 548 - Milano v.Senato**
+```{r}
+xreg_no2_ts_m <- auto.arima(ts_m_train, xreg = no2_ts_m_train, ic = "aicc")
+checkresiduals(xreg_no2_ts_m)
+```
+**Station 571 - Bormio v.Monte Braulio**
+```{r}
+xreg_no2_ts_b <- auto.arima(ts_b_train, xreg = no2_ts_b_train, ic = "aicc")
+checkresiduals(xreg_no2_ts_b)
+```
+**Station 703 - Schivenoglia v. Malpasso**
+```{r}
+xreg_no2_ts_s <- auto.arima(ts_s_train, xreg = no2_ts_s_train, ic = "aicc")
+checkresiduals(xreg_no2_ts_s)
+```
+
 
 ## Non linear models
-```{r}
-fit <- nnetar(ts_m_train)
-r <- as.numeric(resid(fit))
-Acf(r, na.action = na.pass)
-Box.test(r, type = "Ljung-Box") # residuals seems white noise
-Acf(r^2, na.action = na.pass)
-Box.test(r^2, type = "Ljung-Box")
 
-Ccf(as.numeric(ts_m_train), r, na.action = na.pass)
-Ccf(as.numeric(ts_m_train)^2, r, na.action = na.pass)
-Ccf((r * as.numeric(ts_m_train)^2), r, na.action = na.pass)
+A non linear model is tried to fit the data. The model is a neural network autoregressive model, which is a feedforward neural network with a single hidden layer. The model is estimated using the nnetar function, which automatically selects the best neural network model based on the Akaike Information Criterion (AIC).
+In particular, for non-seasonal data the fitted model is denoted as an $NNAR(p,k)$ model, where k is the number of hidden nodes. This is analogous to an AR(p) model but with nonlinear functions. For seasonal data, the fitted model is called an $NNAR(p,P,k)[m]$ model, which is analogous to an $ARIMA(p,0,0)(P,0,0)[m]$ model but with nonlinear function.
+Due to *Universal Approximation Theorem* ^[G. Cybenko. "Approximation by superpositions of a sigmoidal function". In:
+Mathematics of Control, Signals and Systems 2 (1989), pp. 303-314] a neural network with a single hidden layer can approximate any continuous function on a compact subset.
+
+For non linear model classical residual checking using autocorrelation function may not be sufficient to assess the model correctness. In this case, other types of correlation are checked.
+```{r}
+nn_ts_m_auto <- nnetar(ts_m_train)
+plot_nn_residuals(nn_ts_m_auto, aq_station_names_code[1], ts_m_train)
 ```
+
+By the ACF plots of residuals and the residual squared seems to be alliged to white noise assumption. Also the Ljung-Box test p-values suggest that there's no wvidence to reject the null hypotesis of white noise.
+The cross correlation function plots instead shows that there are probably some information left because some lags appear to be correlated.
+
+The same procedure is applied to the other stations and the results are very similar to the Milan's station.
+```{r}
+nn_ts_b_auto <- nnetar(ts_b_train)
+# plot_nn_residuals(nn_ts_b_auto, aq_station_names_code[2], ts_b_train)
+```
+
+```{r}
+nn_ts_s_auto <- nnetar(ts_s_train)
+# plot_nn_residuals(nn_ts_s_auto, aq_station_names_code[3], ts_s_train)
+```
+
+
 ```{r}
 ## For checking some threshold models
 # lag1.plot(dflu, corr = FALSE, col = 4, pch = 20)
@@ -824,9 +998,10 @@ Ccf((r * as.numeric(ts_m_train)^2), r, na.action = na.pass)
 # Box.test(r, type = "Ljung-Box") # residuals seems white noise
 # acf(r^2, na.action = na.pass)
 # Box.test(r^2, type = "Ljung-Box") # residuals seems white noise also if they are ^2 (check is some non lin pattern is resid^2)
+
 # plot(forecast(fit, h = 20, times = 10, PI = TRUE, bootstrap = FALSE))
 ## bootstrap = FALSE: pick randomly the value e_t from Gaussian
-## bootstrap=TRUE: pick error from past observation
+## bootstrap = TRUE: pick error from past observation
 ## This is needed for the forecasting Y_t=f(X_t)+e_t
 # Watt <- APTelectric[, 1]
 # fit <- nnetar(Watt) # Model that use only the information coming from TS Y_t
@@ -849,9 +1024,36 @@ Ccf((r * as.numeric(ts_m_train)^2), r, na.action = na.pass)
 # ccf(Appliances^2, r, na.action = na.pass)
 # ccf((r * Appliances^2), r, na.action = na.pass)
 ```
+
 # Forecasting
 ```{r}
 # Compare models with metrics and with "simpler" forecasting models
+
+yhat <- forecast(auto_ts_m, h = test_set_size, level = c(80, 95))
+plot(yhat)
+# ts_m_test<- xts2ts(ts_m_test, daily_ts_freq)
+
+auto_ts_m %>%
+  forecast(h = test_set_size - 5) %>%
+  accuracy(xts2ts(window_ts_xts(ts_m, df_aq_m$Date, train_set_start, test_set_end - 5), daily_ts_freq))
+
+# training <- window(co2.ts, end=c(2012,12)) #split the data in two subsets using `windows` for considering a portion of the TS
+# test <- window(co2.ts, start=c(2013,1))
+#
+# co2.train <- Arima(training, order=c(0,1,1), #ARIMA(0,1,1)(0,1,1)[12]
+#                   seasonal=c(0,1,1)) #-> (1-B)(1-B^12)Y_t=(1+theta_1*B)(1+THETA_1*B^12)Z_t
+## IT'S A FAMOUS COMMON MODEL USED WHEN DATA ARE SEASONAL
+## When I pass order to the `Arima`, function estimate also the parameters
+#
+# plot(forecast(co2.train,h=48)) #blue value in the plot are the forecasted value
+# lines(test,col=2) #red value are the true value
+#
+#
+# co2.test <- Arima(test,model=co2.train) ##When I pass model to the `Arima`, function use that model, don't estimate anything
+#
+# accuracy(co2.train) # ACF1 is the val of autocorr function of 1 step error, I want that model don't contains autocorrelation in 1 step error
+#                    #(a model with autocorrelation on 1 step error don't respect process behavior)
+# accuracy(co2.test)
 ```
 
 
