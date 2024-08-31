@@ -54,7 +54,7 @@ For this study, daily data are considered, followed by aggregation into monthly 
 ```{r}
 # Pre-requirements
 set.seed(123) # set pseudorandom generator for reproducibility
-requirements <- c("dplyr", "ggplot2", "kableExtra", "ARPALData", "imputeTS", "xts", "forecast")
+requirements <- c("dplyr", "ggplot2", "kableExtra", "ARPALData", "imputeTS", "xts", "forecast", "car")
 for (library_name in requirements) {
   if (!require(library_name, character.only = TRUE, exclude = if (library_name == "dplyr") c("lag", "filter") else NULL)) {
     install.packages(library_name, repos = "https://cloud.r-project.org")
@@ -70,7 +70,7 @@ monthly_ts_freq <- 12
 source("src/utils.R")
 source("src/plotting.R")
 source("src/smoothing.R")
-source("src/evaluation.R")
+source("src/forecasting.R")
 
 # library(styler)
 # style_file("analysis_report.Rmd")
@@ -89,9 +89,9 @@ A dataset with detailed information about the monitoring stations is also availa
 
 ```{r}
 # Data retrieval
-start_date <- "2014-01-01"
-end_date <- "2023-12-31"
-date_range <- seq(from = as.Date(start_date), to = as.Date(end_date), by = 1)
+start_date <- as.Date("2014-01-01")
+end_date <- as.Date("2023-12-31")
+date_range <- seq(from = start_date, to = end_date, by = 1)
 
 # Milano v.Senato, Bormio v.Monte Braulio, Schivenoglia v. Malpasso
 aq_station_ids <- c(548, 571, 703)
@@ -116,8 +116,8 @@ df_aq_stations <- NULL
 if (length(list.files("data/", pattern = "*.rds")) == 0) {
   # Air quality data
   df_aq_daily <- get_ARPA_Lombardia_AQ_data(
-    ID_station = aq_station_ids, Date_begin = start_date,
-    Date_end = end_date, Frequency = "daily", parallel = TRUE
+    ID_station = aq_station_ids, Date_begin = format(start_date),
+    Date_end = format(end_date), Frequency = "daily", parallel = TRUE
   )
   # Station data
   df_aq_stations <- get_ARPA_Lombardia_AQ_registry()
@@ -369,7 +369,7 @@ imputeTS::ggplot_na_imputations(
   window_ts_xts(ts_m, df_aq_m$Date, "2021-01-01", "2022-12-31"),
   window_ts_xts(ts_m_imputed, df_aq_m$Date, "2021-01-01", "2022-12-31"),
   title = paste(aq_station_names_short[1], "-", "Linear imputation"),
-  x_axis_labels = time(window_ts_xts(ts_m, df_aq_m$Date, "2021-01-01", "2022-12-31")),
+  x_axis_labels = seq(as.Date("2021-01-01"), as.Date("2022-12-31"), by = "day"),
   color_points = station_colors[1],
   color_lines = rgb2hex_custom(col2rgb_custom(station_colors[1], 0.6)),
   color_imputations = "red",
@@ -379,7 +379,7 @@ imputeTS::ggplot_na_imputations(
   window_ts_xts(ts_b, df_aq_b$Date, "2014-01-01", "2015-12-31"),
   window_ts_xts(ts_b_imputed, df_aq_b$Date, "2014-01-01", "2015-12-31"),
   title = paste(aq_station_names_short[2], "-", "Linear imputation"),
-  x_axis_labels = time(window_ts_xts(ts_b, df_aq_b$Date, "2014-01-01", "2015-12-31")),
+  x_axis_labels = seq(as.Date("2014-01-01"), as.Date("2015-12-31"), by = "day"),
   color_points = station_colors[2],
   color_lines = rgb2hex_custom(col2rgb_custom(station_colors[2], 0.6)),
   color_imputations = "red",
@@ -389,7 +389,7 @@ imputeTS::ggplot_na_imputations(
   window_ts_xts(ts_s, df_aq_s$Date, "2016-01-01", "2017-12-31"),
   window_ts_xts(ts_s_imputed, df_aq_s$Date, "2016-01-01", "2017-12-31"),
   title = paste(aq_station_names_short[3], "-", "Linear imputation"),
-  x_axis_labels = time(window_ts_xts(ts_s, df_aq_s$Date, "2016-01-01", "2017-12-31")),
+  x_axis_labels = seq(as.Date("2016-01-01"), as.Date("2017-12-31"), by = "day"),
   color_points = station_colors[3],
   color_lines = rgb2hex_custom(col2rgb_custom(station_colors[3], 0.6)),
   color_imputations = "red",
@@ -637,12 +637,21 @@ plot(
 ```
 All stations exhibit a strong seasonal component, with an overall decreasing trend. However, Station 548 shows a notable exception, as it experienced significant peaks in PM10 levels at the end of 2021 and throughout 2022.
 
-The Ljung-Box test supports the validity of the decomposition, as it does not suggest rejecting the null hypothesis that the residuals are white noise for all stations.
+The Ljung-Box test supports the validity of the decomposition, as it does not suggest rejecting the null hypothesis that the residuals are white noise for all stations, except for station 571.
 
 ```{r}
-ljung_box_noise_ts_m <- Box.test(stl_ts_m_monthly$time.series[, "remainder"], type = "Ljung-Box")$p.value
-ljung_box_noise_ts_b <- Box.test(stl_ts_b_monthly$time.series[, "remainder"], type = "Ljung-Box")$p.value
-ljung_box_noise_ts_s <- Box.test(stl_ts_s_monthly$time.series[, "remainder"], type = "Ljung-Box")$p.value
+ljung_box_noise_ts_m <- Box.test(stl_ts_m_monthly$time.series[, "remainder"],
+  lag = ceiling(length(stl_ts_m_monthly$time.series[, "remainder"]) * 0.1),
+  type = "Ljung-Box"
+)$p.value
+ljung_box_noise_ts_b <- Box.test(stl_ts_b_monthly$time.series[, "remainder"],
+  lag = ceiling(length(stl_ts_b_monthly$time.series[, "remainder"]) * 0.1),
+  type = "Ljung-Box"
+)$p.value
+ljung_box_noise_ts_s <- Box.test(stl_ts_s_monthly$time.series[, "remainder"],
+  lag = ceiling(length(stl_ts_s_monthly$time.series[, "remainder"]) * 0.1),
+  type = "Ljung-Box"
+)$p.value
 ljung_box_noise <- data.frame(
   p_value = c(ljung_box_noise_ts_m, ljung_box_noise_ts_b, ljung_box_noise_ts_s)
 )
@@ -658,7 +667,6 @@ ljung_box_noise_ts_b <- NULL
 ljung_box_noise_ts_s <- NULL
 ljung_box_noise <- NULL
 ```
-Decompositions seems white noise by statistical hypotesis test.
 
 
 # Models development
@@ -670,33 +678,29 @@ For an accurate evaluation, it is crucial to avoid using forecast data as traini
 
 ## ARIMA models implementation
 ```{r}
-start_window <- "2022-01-01"
-end_window <- end_date
-start_window <- as.Date(start_window)
-end_window <- as.Date(end_window)
-
 # Train-test split
-test_set_size <- 30
-train_set_start <- start_window
-train_set_end <- as.Date(end_window) - test_set_size - 1
-test_set_start <- train_set_end + 1
-test_set_end <- end_window
-date_range_train <- seq(train_set_start, train_set_end, by = "day")
-date_range_test <- seq(test_set_start, test_set_end, by = "day")
+start_train <- as.Date("2022-01-01")
+date_split <- as.Date("2023-12-01")
+
+start_train_float <- date_to_float(start_train, daily_ts_freq)
+end_train_float <- date_to_float(date_split - 1, daily_ts_freq)
+start_test_float <- end_train_float
+
+train_date_range <- seq(start_train, date_split - 1, by = "day")
+test_date_range <- seq(date_split, end_date, by = "day")
 ```
 
 **Station 548 - Milano v.Senato**
 ```{r}
-ts_m_train_test <- window_ts_xts(ts_m, df_aq_m$Date, train_set_start, test_set_end)
-ts_m_train <- window_ts_xts(ts_m, df_aq_m$Date, train_set_start, train_set_end)
-ts_m_test <- window_ts_xts(ts_m, df_aq_m$Date, test_set_start, test_set_end)
+ts_m_train <- window(ts_m, start_train_float, end_train_float)
+ts_m_test <- window(ts_m, start_test_float)
 plot_train_test_ts(ts_m_train, ts_m_test,
   c("steelblue", "darkorange"),
   main = paste(aq_station_names_code[1]),
-  ylab = paste("PM10", pollutant_units[["PM10"]])
+  ylab = paste("PM10", pollutant_units[["PM10"]]),
+  train_date_range = train_date_range,
+  test_date_range = test_date_range
 )
-ts_m_train <- xts2ts(ts_m_train, daily_ts_freq)
-
 plot_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
 plot_log_arima_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
 ```
@@ -728,7 +732,7 @@ checkresiduals(auto_ts_m)
 ```
 
 ```{r}
-ic_ts_m <- get_arima_IC(arima_models = list(ma5_ts_m, auto_ts_m), suffixes = list("", "[auto]"))
+ic_ts_m <- compute_arima_IC(arima_models = list(ma5_ts_m, auto_ts_m), suffixes = list("", "[auto]"))
 print(ic_ts_m)
 ```
 
@@ -738,16 +742,15 @@ In the end also for the others stations are compared with automatic ARIMA model 
 
 **Station 571 - Bormio v.Monte Braulio**
 ```{r}
-ts_b_train_test <- window_ts_xts(ts_b, df_aq_b$Date, train_set_start, test_set_end)
-ts_b_train <- window_ts_xts(ts_b, df_aq_b$Date, train_set_start, train_set_end)
-ts_b_test <- window_ts_xts(ts_b, df_aq_b$Date, test_set_start, test_set_end)
+ts_b_train <- window(ts_b, start_train_float, end_train_float)
+ts_b_test <- window(ts_b, start_test_float)
 plot_train_test_ts(ts_b_train, ts_b_test,
   c("steelblue", "darkorange"),
   main = paste(aq_station_names_code[2]),
-  ylab = paste("PM10", pollutant_units[["PM10"]])
+  ylab = paste("PM10", pollutant_units[["PM10"]]),
+  train_date_range = train_date_range,
+  test_date_range = test_date_range
 )
-ts_b_train <- xts2ts(ts_b_train, daily_ts_freq)
-
 plot_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40)
 ```
 ```{r}
@@ -763,22 +766,21 @@ auto_ts_b <- auto.arima(ts_b_train, ic = "aicc")
 ```
 
 ```{r}
-ic_ts_b <- get_arima_IC(arima_models = list(ar1_ma2_ts_b, auto_ts_b), suffixes = list("", "[auto]"))
+ic_ts_b <- compute_arima_IC(arima_models = list(ar1_ma2_ts_b, auto_ts_b), suffixes = list("", "[auto]"))
 print(ic_ts_b)
 ```
 
 **Station 703 - Schivenoglia v. Malpasso**
 ```{r}
-ts_s_train_test <- window_ts_xts(ts_s, df_aq_s$Date, train_set_start, test_set_end)
-ts_s_train <- window_ts_xts(ts_s, df_aq_s$Date, train_set_start, train_set_end)
-ts_s_test <- window_ts_xts(ts_s, df_aq_s$Date, test_set_start, test_set_end)
+ts_s_train <- window(ts_s, start_train_float, end_train_float)
+ts_s_test <- window(ts_s, start_test_float)
 plot_train_test_ts(ts_s_train, ts_s_test,
   c("steelblue", "darkorange"),
   main = paste(aq_station_names_code[3]),
-  ylab = paste("PM10", pollutant_units[["PM10"]])
+  ylab = paste("PM10", pollutant_units[["PM10"]]),
+  train_date_range = train_date_range,
+  test_date_range = test_date_range
 )
-ts_s_train <- xts2ts(ts_s_train, daily_ts_freq)
-
 plot_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40)
 ```
 ```{r}
@@ -794,7 +796,7 @@ auto_ts_s <- auto.arima(ts_s_train, ic = "aicc")
 ```
 
 ```{r}
-ic_ts_s <- get_arima_IC(arima_models = list(ar1_ma3_ts_s, auto_ts_s), suffixes = list("", "[auto]"))
+ic_ts_s <- compute_arima_IC(arima_models = list(ar1_ma3_ts_s, auto_ts_s), suffixes = list("", "[auto]"))
 print(ic_ts_s)
 ```
 
@@ -812,36 +814,36 @@ Carbon Monoxide (CO): While CO is primarily a gas, it can contribute indirectly 
 Benzene, while a hazardous air pollutant, is less directly related to PM10 formation compared to the other three pollutants.
 
 ```{r}
-no2_ts_m <- xts(df_aq_m$NO2, order.by = df_aq_m$Date)
-no2_ts_b <- xts(df_aq_b$NO2, order.by = df_aq_b$Date)
-no2_ts_s <- xts(df_aq_s$NO2, order.by = df_aq_s$Date)
-no2_ts_m_train <- window_ts_xts(no2_ts_m, df_aq_m$Date, train_set_start, train_set_end)
-no2_ts_b_train <- window_ts_xts(no2_ts_b, df_aq_b$Date, train_set_start, train_set_end)
-no2_ts_s_train <- window_ts_xts(no2_ts_s, df_aq_s$Date, train_set_start, train_set_end)
-no2_ts_m_train <- xts2ts(imputeTS::na_interpolation(no2_ts_m_train), daily_ts_freq)
-no2_ts_b_train <- xts2ts(imputeTS::na_interpolation(no2_ts_b_train), daily_ts_freq)
-no2_ts_s_train <- xts2ts(imputeTS::na_interpolation(no2_ts_s_train), daily_ts_freq)
+no2_ts_m <- xts2ts(xts(df_aq_m$NO2, order.by = df_aq_m$Date), daily_ts_freq)
+no2_ts_b <- xts2ts(xts(df_aq_b$NO2, order.by = df_aq_b$Date), daily_ts_freq)
+no2_ts_s <- xts2ts(xts(df_aq_s$NO2, order.by = df_aq_s$Date), daily_ts_freq)
+no2_ts_m <- imputeTS::na_interpolation(no2_ts_m)
+no2_ts_b <- imputeTS::na_interpolation(no2_ts_b)
+no2_ts_s <- imputeTS::na_interpolation(no2_ts_s)
+no2_ts_m_train <- window(no2_ts_m, start_train_float, end_train_float)
+no2_ts_b_train <- window(no2_ts_b, start_train_float, end_train_float)
+no2_ts_s_train <- window(no2_ts_s, start_train_float, end_train_float)
 
-# co_ts_m <- xts(df_aq_m$CO, order.by = df_aq_m$Date)
-# co_ts_b <- xts(df_aq_b$CO, order.by = df_aq_b$Date)
-# co_ts_s <- xts(df_aq_s$CO, order.by = df_aq_s$Date)
-# co_ts_m_train <- window_ts_xts(co_ts_m, df_aq_m$Date, train_set_start, train_set_end)
-# co_ts_b_train <- window_ts_xts(co_ts_b, df_aq_b$Date, train_set_start, train_set_end)
-# co_ts_s_train <- window_ts_xts(co_ts_s, df_aq_s$Date, train_set_start, train_set_end)
 ## Convert milligrams per cubic meter to micrograms per cubic meter
-# co_ts_m_train <- xts2ts(imputeTS::na_interpolation(co_ts_m_train), daily_ts_freq) * 1000
-# co_ts_b_train <- xts2ts(imputeTS::na_interpolation(co_ts_b_train), daily_ts_freq) * 1000
-# co_ts_s_train <- xts2ts(imputeTS::na_interpolation(co_ts_s_train), daily_ts_freq) * 1000
-
-# nox_ts_m <- xts(df_aq_m$NOx, order.by = df_aq_m$Date)
-# nox_ts_b <- xts(df_aq_b$NOx, order.by = df_aq_b$Date)
-# nox_ts_s <- xts(df_aq_s$NOx, order.by = df_aq_s$Date)
-# nox_ts_m_train <- window_ts_xts(nox_ts_m, df_aq_m$Date, train_set_start, train_set_end)
-# nox_ts_b_train <- window_ts_xts(nox_ts_b, df_aq_b$Date, train_set_start, train_set_end)
-# nox_ts_s_train <- window_ts_xts(nox_ts_s, df_aq_s$Date, train_set_start, train_set_end)
-# nox_ts_m_train <- xts2ts(imputeTS::na_interpolation(nox_ts_m_train), daily_ts_freq)
-# nox_ts_b_train <- xts2ts(imputeTS::na_interpolation(nox_ts_b_train), daily_ts_freq)
-# nox_ts_s_train <- xts2ts(imputeTS::na_interpolation(nox_ts_s_train), daily_ts_freq)
+# co_ts_m <- xts2ts(xts(df_aq_m$CO, order.by = df_aq_m$Date), daily_ts_freq) * 1000
+# co_ts_b <- xts2ts(xts(df_aq_b$CO, order.by = df_aq_b$Date), daily_ts_freq) * 1000
+# co_ts_s <- xts2ts(xts(df_aq_s$CO, order.by = df_aq_s$Date), daily_ts_freq) * 1000
+# co_ts_m <- imputeTS::na_interpolation(co_ts_m)
+# co_ts_b <- imputeTS::na_interpolation(co_ts_b)
+# co_ts_s <- imputeTS::na_interpolation(co_ts_s)
+# co_ts_m_train <- window(co_ts_m, start_train_float, end_train_float)
+# co_ts_b_train <- window(co_ts_b, start_train_float, end_train_float)
+# co_ts_s_train <- window(co_ts_s, start_train_float, end_train_float)
+#
+# nox_ts_m <- xts2ts(xts(df_aq_m$NOx, order.by = df_aq_m$Date), daily_ts_freq)
+# nox_ts_b <- xts2ts(xts(df_aq_b$NOx, order.by = df_aq_b$Date), daily_ts_freq)
+# nox_ts_s <- xts2ts(xts(df_aq_s$NOx, order.by = df_aq_s$Date), daily_ts_freq)
+# nox_ts_m <- imputeTS::na_interpolation(nox_ts_m)
+# nox_ts_b <- imputeTS::na_interpolation(nox_ts_b)
+# nox_ts_s <- imputeTS::na_interpolation(nox_ts_s)
+# nox_ts_m_train <- window(nox_ts_m, start_train_float, end_train_float)
+# nox_ts_b_train <- window(nox_ts_b, start_train_float, end_train_float)
+# nox_ts_s_train <- window(nox_ts_s, start_train_float, end_train_float)
 ```
 
 It seems that between NO2 and PM10 there's a linear relationship. This is confirmed by the linear regression model where the predictor appear strongly significant. 
@@ -967,7 +969,7 @@ Mathematics of Control, Signals and Systems 2 (1989), pp. 303-314] a neural netw
 For non linear model classical residual checking using autocorrelation function may not be sufficient to assess the model correctness. In this case, other types of correlation are checked.
 ```{r}
 nn_ts_m_auto <- nnetar(ts_m_train)
-plot_nn_residuals(nn_ts_m_auto, aq_station_names_code[1], ts_m_train)
+plot_nn_residuals(nn_ts_m_auto, aq_station_names_code[1], ts_m_train, lag_max = 40)
 ```
 
 By the ACF plots of residuals and the residual squared seems to be alliged to white noise assumption. Also the Ljung-Box test p-values suggest that there's no wvidence to reject the null hypotesis of white noise.
@@ -976,12 +978,12 @@ The cross correlation function plots instead shows that there are probably some 
 The same procedure is applied to the other stations and the results are very similar to the Milan's station.
 ```{r}
 nn_ts_b_auto <- nnetar(ts_b_train)
-# plot_nn_residuals(nn_ts_b_auto, aq_station_names_code[2], ts_b_train)
+# plot_nn_residuals(nn_ts_b_auto, aq_station_names_code[2], ts_b_train, lag_max = 40)
 ```
 
 ```{r}
 nn_ts_s_auto <- nnetar(ts_s_train)
-# plot_nn_residuals(nn_ts_s_auto, aq_station_names_code[3], ts_s_train)
+# plot_nn_residuals(nn_ts_s_auto, aq_station_names_code[3], ts_s_train, lag_max = 40)
 ```
 
 
@@ -1029,13 +1031,13 @@ nn_ts_s_auto <- nnetar(ts_s_train)
 ```{r}
 # Compare models with metrics and with "simpler" forecasting models
 
-yhat <- forecast(auto_ts_m, h = test_set_size, level = c(80, 95))
-plot(yhat)
-# ts_m_test<- xts2ts(ts_m_test, daily_ts_freq)
+# plot_forecast <- function(model, h, ts, date_range, date_start_train, date_start_test, freq)
+# forecast_residuals_analysis <- function(res, model_name)
+# compute_forecast_metrics <- function(model, h, ts, date_range, date_start_train, date_start_test, freq)
 
-auto_ts_m %>%
-  forecast(h = test_set_size - 5) %>%
-  accuracy(xts2ts(window_ts_xts(ts_m, df_aq_m$Date, train_set_start, test_set_end - 5), daily_ts_freq))
+plot_forecast(auto_ts_m, 31, ts_m_train, ts_m_test, "PM10", "ARIMA")
+forecast_residuals_analysis(auto_ts_m, 31, "ARIMA")
+compute_forecast_metrics(auto_ts_m, 31, ts_m_train, ts_m_test)
 
 # training <- window(co2.ts, end=c(2012,12)) #split the data in two subsets using `windows` for considering a portion of the TS
 # test <- window(co2.ts, start=c(2013,1))

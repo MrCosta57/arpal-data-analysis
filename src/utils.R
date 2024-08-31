@@ -68,6 +68,18 @@ window_ts_xts <- function(ts_obj, date_range, start_date, end_date) {
   return(xts_obj)
 }
 
+date_to_float <- function(date, freq) {
+  date <- as.Date(date)
+  # Extract date components
+  year <- as.numeric(format(date, "%Y"))
+  day <- as.numeric(format(date, "%j"))
+
+  # Calculate the floating-point representation
+  date_float <- year + (day - 1) / freq
+
+  return(date_float)
+}
+
 test_arima_coefficients <- function(arima_model) {
   # thetahat_i/SE(thetahat_i)=t_i
   # can be used for significance test of the parameter theta_i

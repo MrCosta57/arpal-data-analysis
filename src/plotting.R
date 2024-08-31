@@ -22,7 +22,10 @@ print_table_custom <- function(
 }
 
 plot_single_ts <- function(ts, ts_name, ts_color, ylab) {
-  print(plot.xts(
+  if (class(ts)[1] != "xts") {
+    stop("The time series must be of class 'xts'.")
+  }
+  print(plot(
     ts,
     type = "l",
     col = ts_color,
@@ -64,9 +67,12 @@ plot_ts_grid <- function(ts_list, ts_names, ts_colors, ylab, n_row = 1) {
 
 plot_3_ts <- function(ts1, ts2, ts3, ts_colors, main, ylab, legend_names) {
   # Find the range for the y-axis
+  if (class(ts1)[1] != "xts" | class(ts2)[1] != "xts" | class(ts3)[1] != "xts") {
+    stop("All time series must be of class 'xts'.")
+  }
   y_range <- range(sapply(list(ts1, ts2, ts3), range, na.rm = TRUE))
 
-  plot.xts(
+  plot(
     ts1,
     lty = 1,
     col = ts_colors[1], lwd = 1, main = main,
@@ -85,6 +91,9 @@ plot_3_ts <- function(ts1, ts2, ts3, ts_colors, main, ylab, legend_names) {
 }
 
 plot_filtered_ts <- function(original_ts, filtered_ts_list, line_colors, legend_names, main, ylab) {
+  if (class(original_ts) != "ts" | class(filtered_ts_list[[1]]) != "ts") {
+    stop("All time series must be of class 'ts'.")
+  }
   # Plot the original time series
   plot(
     original_ts,
@@ -108,14 +117,15 @@ plot_filtered_ts <- function(original_ts, filtered_ts_list, line_colors, legend_
   )
 }
 
-plot_train_test_ts <- function(train_ts, test_ts, line_colors, legend_names, main, ylab) {
+plot_train_test_ts <- function(train_ts, test_ts, line_colors, legend_names, main, ylab, train_date_range, test_date_range) {
+  train_ts <- ts2xts(train_ts, train_date_range)
+  test_ts <- ts2xts(test_ts, test_date_range)
   plot(index(train_ts), coredata(train_ts),
     main = main, ylab = ylab, col = line_colors[1], type = "l", xlab = "Time"
   )
-
   lines(index(test_ts), coredata(test_ts), col = line_colors[2], type = "l")
 
-  legend("topright",
+  legend("topleft",
     legend = c("Train", "Test"),
     lty = 1, lwd = 1, col = line_colors
   )
@@ -123,6 +133,9 @@ plot_train_test_ts <- function(train_ts, test_ts, line_colors, legend_names, mai
 
 
 plot_acf_pacf <- function(ts, main_text, lag_max = NULL) {
+  if (class(ts) != "ts") {
+    stop("The time series must be of class 'ts'.")
+  }
   par(mfrow = c(1, 2))
   # Set outer margins to make room for the title
   par(oma = c(0, 0, 2, 0))
@@ -141,6 +154,9 @@ plot_acf_pacf <- function(ts, main_text, lag_max = NULL) {
 }
 
 plot_ccf <- function(ts1, ts2, main_text, lag_max = NULL) {
+  if (class(ts1) != "ts" | class(ts2) != "ts") {
+    stop("Both time series must be of class 'ts'.")
+  }
   if (is.null(lag_max)) {
     lag_max <- as.integer(length(ts1) / 4)
   }
@@ -153,6 +169,10 @@ plot_ccf <- function(ts1, ts2, main_text, lag_max = NULL) {
 }
 
 plot_log_arima_acf_pacf <- function(ts, station_name, lag_max = NULL, ylab = "PM10") {
+  if (class(ts) != "ts") {
+    stop("The time series must be of class 'ts'.")
+  }
+
   if (is.null(lag_max)) {
     lag_max <- as.integer(length(ts) / 4)
   }
@@ -174,6 +194,9 @@ plot_log_arima_acf_pacf <- function(ts, station_name, lag_max = NULL, ylab = "PM
 }
 
 plot_diff_arima_acf_pacf <- function(ts, station_name, lag_max = NULL, ylab = "PM10", lag = 1, difference = 1) {
+  if (class(ts) != "ts") {
+    stop("The time series must be of class 'ts'.")
+  }
   if (is.null(lag_max)) {
     lag_max <- as.integer(length(ts) / 4)
   }
@@ -225,6 +248,7 @@ plot_nn_residuals <- function(nn_model, model_name, ts, lag_max = NULL) {
   Ccf(r * ts^2, r, main = paste(model_name, "residuals - residuals*time series^2"), lag.max = lag_max)
   par(mfrow = c(1, 1))
 }
+
 
 plot_AQ_stations <- function(data_aq,
                              title = "Map of ARPA stations in Lombardy",
