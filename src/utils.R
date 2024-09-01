@@ -80,6 +80,14 @@ date_to_float <- function(date, freq) {
   return(date_float)
 }
 
+get_model_name <- function(model) {
+  if (is.null(model$method)) {
+    return(as.character(model))
+  } else {
+    return(as.character(model$method))
+  }
+}
+
 test_arima_coefficients <- function(arima_model) {
   # thetahat_i/SE(thetahat_i)=t_i
   # can be used for significance test of the parameter theta_i

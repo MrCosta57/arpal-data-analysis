@@ -26,6 +26,7 @@ knitr::opts_chunk$set(warning = FALSE)
 knitr::opts_chunk$set(message = FALSE)
 knitr::opts_chunk$set(fig.align = "center")
 options(digits = 4)
+options(error = recover)
 ```
 
 ```{r environment setup, include=FALSE}
@@ -694,13 +695,6 @@ test_date_range <- seq(date_split, end_date, by = "day")
 ```{r}
 ts_m_train <- window(ts_m, start_train_float, end_train_float)
 ts_m_test <- window(ts_m, start_test_float)
-plot_train_test_ts(ts_m_train, ts_m_test,
-  c("steelblue", "darkorange"),
-  main = paste(aq_station_names_code[1]),
-  ylab = paste("PM10", pollutant_units[["PM10"]]),
-  train_date_range = train_date_range,
-  test_date_range = test_date_range
-)
 plot_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
 plot_log_arima_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
 ```
@@ -712,6 +706,7 @@ The lag is show until 40 lags, because after more than a month of inspection of 
 ```{r}
 plot_diff_arima_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
 plot_diff_arima_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40, lag = 7)
+plot_diff_arima_acf_pacf(ts_m_train, aq_station_names_code[1], lag = as.integer(daily_ts_freq))
 ```
 
 Differencing time series instead seems to be very benefician indeed data seems now more alliged to stationary assumption.
@@ -731,10 +726,6 @@ auto_ts_m <- auto.arima(ts_m_train, ic = "aicc")
 checkresiduals(auto_ts_m)
 ```
 
-```{r}
-ic_ts_m <- compute_arima_IC(arima_models = list(ma5_ts_m, auto_ts_m), suffixes = list("", "[auto]"))
-print(ic_ts_m)
-```
 
 TODO: Describe results
 The same procedure is applied also for the other stations, by differencing one time the time series to make them more stationary and inspecting the plot for guess the best ARIMA model for them.
@@ -744,61 +735,45 @@ In the end also for the others stations are compared with automatic ARIMA model 
 ```{r}
 ts_b_train <- window(ts_b, start_train_float, end_train_float)
 ts_b_test <- window(ts_b, start_test_float)
-plot_train_test_ts(ts_b_train, ts_b_test,
-  c("steelblue", "darkorange"),
-  main = paste(aq_station_names_code[2]),
-  ylab = paste("PM10", pollutant_units[["PM10"]]),
-  train_date_range = train_date_range,
-  test_date_range = test_date_range
-)
 plot_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40)
+# plot_log_arima_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40)
 ```
 ```{r}
 plot_diff_arima_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40)
+# plot_diff_arima_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40, lag = 7)
+# plot_diff_arima_acf_pacf(ts_b_train, aq_station_names_code[2], lag = as.integer(daily_ts_freq))
 ```
 ```{r}
 ar1_ma2_ts_b <- Arima(ts_b_train, order = c(1, 1, 2))
-# checkresiduals(ar1_ma2_ts_b)
+checkresiduals(ar1_ma2_ts_b)
 ```
 ```{r}
 auto_ts_b <- auto.arima(ts_b_train, ic = "aicc")
-# checkresiduals(auto_ts_b)
+checkresiduals(auto_ts_b)
 ```
 
-```{r}
-ic_ts_b <- compute_arima_IC(arima_models = list(ar1_ma2_ts_b, auto_ts_b), suffixes = list("", "[auto]"))
-print(ic_ts_b)
-```
 
 **Station 703 - Schivenoglia v. Malpasso**
 ```{r}
 ts_s_train <- window(ts_s, start_train_float, end_train_float)
 ts_s_test <- window(ts_s, start_test_float)
-plot_train_test_ts(ts_s_train, ts_s_test,
-  c("steelblue", "darkorange"),
-  main = paste(aq_station_names_code[3]),
-  ylab = paste("PM10", pollutant_units[["PM10"]]),
-  train_date_range = train_date_range,
-  test_date_range = test_date_range
-)
 plot_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40)
+# plot_log_arima_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40)
 ```
 ```{r}
 plot_diff_arima_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40)
+# plot_diff_arima_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40, lag = 7)
+# plot_diff_arima_acf_pacf(ts_s_train, aq_station_names_code[3], lag = as.integer(daily_ts_freq))
 ```
 ```{r}
 ar1_ma3_ts_s <- Arima(ts_s_train, order = c(1, 1, 3))
-# checkresiduals(ar1_ma3_ts_s)
+checkresiduals(ar1_ma3_ts_s)
 ```
 ```{r}
 auto_ts_s <- auto.arima(ts_s_train, ic = "aicc")
-# checkresiduals(auto_ts_s)
+checkresiduals(auto_ts_s)
 ```
 
-```{r}
-ic_ts_s <- compute_arima_IC(arima_models = list(ar1_ma3_ts_s, auto_ts_s), suffixes = list("", "[auto]"))
-print(ic_ts_s)
-```
 
 In all the stations model fitted using automatic criteria selection have lower value of AICc so these one are selected.
 Notice that the manual selected model in some stations (e.i station 548 and 571) have lower Bic value so they appear better is a more parsimonious model is desidered.
@@ -978,88 +953,121 @@ The cross correlation function plots instead shows that there are probably some 
 The same procedure is applied to the other stations and the results are very similar to the Milan's station.
 ```{r}
 nn_ts_b_auto <- nnetar(ts_b_train)
-# plot_nn_residuals(nn_ts_b_auto, aq_station_names_code[2], ts_b_train, lag_max = 40)
+plot_nn_residuals(nn_ts_b_auto, aq_station_names_code[2], ts_b_train, lag_max = 40)
 ```
-
 ```{r}
 nn_ts_s_auto <- nnetar(ts_s_train)
-# plot_nn_residuals(nn_ts_s_auto, aq_station_names_code[3], ts_s_train, lag_max = 40)
+plot_nn_residuals(nn_ts_s_auto, aq_station_names_code[3], ts_s_train, lag_max = 40)
 ```
 
-
-```{r}
-## For checking some threshold models
-# lag1.plot(dflu, corr = FALSE, col = 4, pch = 20)
-#
-## Neural Network Autoregressive Model
-# fit <- nnetar(y, p = 9, size = 5)
-## Y_t=f(Y_{t-1}, ..., Y_{t-9})+Z_t where Z_t is WN(0, sigma^2) independent
-## f(Y_{t-1}, ..., Y_{t-9}) is a NN with K=5 (5 hidden unit)
-# r <- as.numeric(resid(fit))
-# acf(r, na.action = na.pass)
-# Box.test(r, type = "Ljung-Box") # residuals seems white noise
-# acf(r^2, na.action = na.pass)
-# Box.test(r^2, type = "Ljung-Box") # residuals seems white noise also if they are ^2 (check is some non lin pattern is resid^2)
-
-# plot(forecast(fit, h = 20, times = 10, PI = TRUE, bootstrap = FALSE))
-## bootstrap = FALSE: pick randomly the value e_t from Gaussian
-## bootstrap = TRUE: pick error from past observation
-## This is needed for the forecasting Y_t=f(X_t)+e_t
-# Watt <- APTelectric[, 1]
-# fit <- nnetar(Watt) # Model that use only the information coming from TS Y_t
-## param p is automatically derived here because it's not specified
-# nnetforecast <- forecast(fit, h = 400, PI = FALSE)
-# plot(nnetforecast)
-# Appliances <- as.numeric(APTelectric[, 2])
-#
-# fit2 <- nnetar(Watt, xreg = Appliances) # Model that use also the info of the second TS
-# print(fit2)
-# r <- as.numeric(resid(fit2))
-# acf(r, na.action = na.pass)
-# Box.test(r, type = "Ljung-Box")
-# acf(r^2, na.action = na.pass)
-# Box.test(r^2, type = "Ljung-Box")
-#
-## Check also other relations in the residuals
-# par(mfrow = c(2, 2))
-# ccf(Appliances, r, na.action = na.pass)
-# ccf(Appliances^2, r, na.action = na.pass)
-# ccf((r * Appliances^2), r, na.action = na.pass)
-```
 
 # Forecasting
+
+An example of train-test split of Milan's station data is shown below.
+If dynamic regression the mean of the observation in the training set for the predictor is used
+
 ```{r}
-# Compare models with metrics and with "simpler" forecasting models
+plot_train_test_ts(ts_m_train, ts_m_test,
+  c("steelblue", "darkorange"),
+  main = paste(aq_station_names_code[1]),
+  ylab = paste("PM10", pollutant_units[["PM10"]]),
+  train_date_range = train_date_range,
+  test_date_range = test_date_range
+)
+# plot_train_test_ts(ts_b_train, ts_b_test,
+#  c("steelblue", "darkorange"),
+#  main = paste(aq_station_names_code[2]),
+#  ylab = paste("PM10", pollutant_units[["PM10"]]),
+#  train_date_range = train_date_range,
+#  test_date_range = test_date_range
+# )
+# plot_train_test_ts(ts_s_train, ts_s_test,
+#  c("steelblue", "darkorange"),
+#  main = paste(aq_station_names_code[3]),
+#  ylab = paste("PM10", pollutant_units[["PM10"]]),
+#  train_date_range = train_date_range,
+#  test_date_range = test_date_range
+# )
+```
 
-# plot_forecast <- function(model, h, ts, date_range, date_start_train, date_start_test, freq)
-# forecast_residuals_analysis <- function(res, model_name)
-# compute_forecast_metrics <- function(model, h, ts, date_range, date_start_train, date_start_test, freq)
+```{r}
+largest_horizon <- 31
+ts_m_final_model_list <- list(ma5_ts_m, auto_ts_m, nn_ts_m_auto, xreg_no2_ts_m)
+ts_b_final_model_list <- list(ar1_ma2_ts_b, auto_ts_b, nn_ts_b_auto, xreg_no2_ts_b)
+ts_s_final_model_list <- list(ar1_ma3_ts_s, auto_ts_s, nn_ts_s_auto, xreg_no2_ts_s)
 
-plot_forecast(auto_ts_m, 31, ts_m_train, ts_m_test, "PM10", "ARIMA")
-forecast_residuals_analysis(auto_ts_m, 31, "ARIMA")
-compute_forecast_metrics(auto_ts_m, 31, ts_m_train, ts_m_test)
+IC_values_ts_m <- compute_arima_IC(arima_models = ts_m_final_model_list[-3], suffixes = list("", "[auto]", "[auto]"))
+IC_values_ts_b <- compute_arima_IC(arima_models = ts_b_final_model_list[-3], suffixes = list("", "[auto]", "[auto]"))
+IC_values_ts_s <- compute_arima_IC(arima_models = ts_s_final_model_list[-3], suffixes = list("", "[auto]", "[auto]"))
 
-# training <- window(co2.ts, end=c(2012,12)) #split the data in two subsets using `windows` for considering a portion of the TS
-# test <- window(co2.ts, start=c(2013,1))
-#
-# co2.train <- Arima(training, order=c(0,1,1), #ARIMA(0,1,1)(0,1,1)[12]
-#                   seasonal=c(0,1,1)) #-> (1-B)(1-B^12)Y_t=(1+theta_1*B)(1+THETA_1*B^12)Z_t
-## IT'S A FAMOUS COMMON MODEL USED WHEN DATA ARE SEASONAL
-## When I pass order to the `Arima`, function estimate also the parameters
-#
-# plot(forecast(co2.train,h=48)) #blue value in the plot are the forecasted value
-# lines(test,col=2) #red value are the true value
-#
-#
-# co2.test <- Arima(test,model=co2.train) ##When I pass model to the `Arima`, function use that model, don't estimate anything
-#
-# accuracy(co2.train) # ACF1 is the val of autocorr function of 1 step error, I want that model don't contains autocorrelation in 1 step error
-#                    #(a model with autocorrelation on 1 step error don't respect process behavior)
-# accuracy(co2.test)
+print_table_custom(IC_values_ts_m[[1]], title = paste(aq_station_names_code[1], " - ARIMA models IC values"))
+print_table_custom(IC_values_ts_b[[1]], title = paste(aq_station_names_code[2], " - ARIMA models IC values"))
+print_table_custom(IC_values_ts_s[[1]], title = paste(aq_station_names_code[3], " - ARIMA models IC values"))
+```
+
+For conveniance forecast analysis is applied only to Station 548 in Milan but the same procedure can be applied to the other stations.
+```{r}
+# Select the best model in the old order of the list
+best_idx <- IC_values_ts_m[[2]][which.min(IC_values_ts_m[[1]]$AICc)]
+# Best model according to AICc, excluding NN model
+best_arima_ts_m <- ts_m_final_model_list[-3][[best_idx]]
+plot_forecast(best_arima_ts_m, largest_horizon, ts_m_train, ts_m_test,
+  ylab = paste("PM10", pollutant_units[["PM10"]]),
+  main = paste("Best ARIMA", "-", aq_station_names_code[1]),
+)
+forecast_residuals_analysis(best_arima_ts_m, largest_horizon, model_name = "Best ARIMA")
+```
+```{r}
+plot_forecast(nn_ts_m_auto, largest_horizon, ts_m_train, ts_m_test,
+  ylab = paste("PM10", pollutant_units[["PM10"]]),
+  main = paste(nn_ts_m_auto$method, "-", aq_station_names_code[1])
+)
+
+forecast_residuals_analysis(nn_ts_m_auto, largest_horizon)
+```
+```{r}
+ts_m_forecast_model_list <- list(
+  meanf(ts_m_train, largest_horizon),
+  rwf(ts_m_train, largest_horizon, drift = TRUE),
+  ses(ts_m_train, largest_horizon),
+  holt(ts_m_train, largest_horizon),
+  best_arima_ts_m,
+  nn_ts_m_auto
+)
+
+plot_forecast_multiple_models(ts_m_forecast_model_list,
+  largest_horizon,
+  ts_m_train,
+  ts_m_test,
+  ylab = paste("PM10", pollutant_units[["PM10"]]),
+  main = paste("Forecast comparison -", aq_station_names_code[1]),
+  colors = c("darkgray", "blue", "green", "purple", "orange", "#5f3e00"),
+  skip_n_train_obs = length(ts_m_train) - 1
+)
+```
+
+```{r}
+table <- get_forecast_metric_table(ts_m_forecast_model_list, 1, ts_m_train, ts_m_test, largest_horizon)
+print_table_custom(table, title = paste("Forecast metrics -", aq_station_names_code[1], " - 1 day ahead"))
+
+table <- get_forecast_metric_table(ts_m_forecast_model_list, 3, ts_m_train, ts_m_test, largest_horizon)
+print_table_custom(table, title = paste("Forecast metrics -", aq_station_names_code[1], " - 3 days ahead"))
+
+table <- get_forecast_metric_table(ts_m_forecast_model_list, 7, ts_m_train, ts_m_test, largest_horizon)
+print_table_custom(table, title = paste("Forecast metrics -", aq_station_names_code[1], " - 7 days ahead"))
+
+table <- get_forecast_metric_table(ts_m_forecast_model_list, 14, ts_m_train, ts_m_test, largest_horizon)
+print_table_custom(table, title = paste("Forecast metrics -", aq_station_names_code[1], " - 14 days ahead"))
+
+table <- get_forecast_metric_table(ts_m_forecast_model_list, 31, ts_m_train, ts_m_test, largest_horizon)
+print_table_custom(table, title = paste("Forecast metrics -", aq_station_names_code[1], " - 31 days ahead"))
 ```
 
 
 # Conclusions
+
+For modelling daily data probably are needed some more advanced models
+or model them with model the seasonality using Fourier terms ^[https://robjhyndman.com/hyndsight/longseasonality/]
 ```{r}
 # Discussion and further perspectives.
 # The discussion section should recall the main results and point to new research questions, that appeared from your work, or possible limitations.
