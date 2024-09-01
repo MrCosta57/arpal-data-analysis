@@ -134,10 +134,3 @@ prewhitening <- function(x, model, d = NULL) {
   }
   as.ts(x)
 }
-
-
-# library(xts)
-# a<-xts(rnorm(1000), order.by = seq(as.Date("2021-01-01"), by = "day", length.out = 1000), frequency = 7)
-# plot(a)
-
-# plot(stl(ts(as.numeric(ts_m), frequency = 7), s.window = "periodic"))

@@ -168,53 +168,12 @@ plot_ccf <- function(ts1, ts2, main_text, lag_max = NULL) {
   grid()
 }
 
-plot_log_arima_acf_pacf <- function(ts, station_name, lag_max = NULL, ylab = "PM10") {
-  if (class(ts) != "ts") {
-    stop("The time series must be of class 'ts'.")
-  }
-
-  if (is.null(lag_max)) {
-    lag_max <- as.integer(length(ts) / 4)
-  }
-  layout_matrix <- matrix(c(1, 1, 2, 3), nrow = 2, ncol = 2, byrow = TRUE)
-  par(oma = c(0, 0, 2, 0))
-  par(mar = c(5, 4, 1, 2))
-
-  layout(layout_matrix)
+log_my <- function(ts) {
   log_ts <- ts(ts)
   log_ts[log_ts == 0] <- 1
   log_ts <- log(log_ts)
-  plot(log_ts, xlab = "Time", ylab = paste0("log(", ylab, ")"))
-  Acf(ts, lag.max = lag_max, main = "")
-  Pacf(ts, lag.max = lag_max, main = "")
-  mtext(paste(station_name, "-", "log"), outer = TRUE, cex = 1.5)
-  par(oma = c(0, 0, 0, 0))
-  par(mar = c(0, 0, 0, 0))
-  par(mfrow = c(1, 1))
+  return(log_ts)
 }
-
-plot_diff_arima_acf_pacf <- function(ts, station_name, lag_max = NULL, ylab = "PM10", lag = 1, difference = 1) {
-  if (class(ts) != "ts") {
-    stop("The time series must be of class 'ts'.")
-  }
-  if (is.null(lag_max)) {
-    lag_max <- as.integer(length(ts) / 4)
-  }
-  layout_matrix <- matrix(c(1, 1, 2, 3), nrow = 2, ncol = 2, byrow = TRUE)
-  par(oma = c(0, 0, 2, 0))
-  par(mar = c(5, 4, 1, 2))
-
-  layout(layout_matrix)
-  diff_ts <- diff(ts, differences = difference, lag = lag)
-  plot(diff_ts, xlab = "Time", ylab = paste0("diff(", ylab, ")"))
-  Acf(diff_ts, lag.max = lag_max, main = "")
-  Pacf(diff_ts, lag.max = lag_max, main = "")
-  mtext(paste0(station_name, " - ", "difference ", difference, " lag ", lag), outer = TRUE, cex = 1.5)
-  par(oma = c(0, 0, 0, 0))
-  par(mar = c(0, 0, 0, 0))
-  par(mfrow = c(1, 1))
-}
-
 
 plot_pollutant_XY_lin <- function(x, y, xlab, ylab, station_name, unit_measure_x, unit_measure_y) {
   plot(y ~ x,
@@ -235,11 +194,12 @@ plot_nn_residuals <- function(nn_model, model_name, ts, lag_max = NULL) {
   }
   par(mfrow = c(1, 2))
   r <- resid(nn_model)
+  r_len_div5 <- as.integer(length(r) / 5)
   Acf(r, main = paste(model_name, "residuals"), lag.max = lag_max)
-  print(Box.test(r, type = "Ljung-Box")) # residuals seems white noise
   Acf(r^2, main = paste(model_name, "residuals^2"), lag.max = lag_max)
-  print(Box.test(r^2, type = "Ljung-Box"))
   par(mfrow = c(1, 1))
+  print(Box.test(r, lag = min(10, r_len_div5), type = "Ljung-Box"))
+  print(Box.test(r^2, lag = min(10, r_len_div5), type = "Ljung-Box"))
 
   layout_matrix <- matrix(c(1, 2, 3, 3), nrow = 2, ncol = 2, byrow = TRUE)
   layout(layout_matrix)

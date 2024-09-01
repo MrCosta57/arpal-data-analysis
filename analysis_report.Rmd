@@ -50,7 +50,7 @@ Considering the data provided by the region, the following pollutants will be an
 
 In particular, PM10 is selected for the main part of this analysis because it serves as a comprehensive indicator of particulate pollution from a wide range of sources, such as traffic emissions, industrial processes, and the secondary formation of particles from gaseous pollutants. Its direct link to adverse health effects, including respiratory and cardiovascular diseases, makes PM10 a crucial measure of air quality. Additionally, other pollutants like Benzene, CO, NO₂, and NOₓ can contribute to PM10 levels through both primary emissions and secondary reactions, making them valuable predictor variables for analyzing fluctuations in PM10 concentrations.
 
-For this study, daily data are considered, followed by aggregation into monthly averages to facilitate a long-term analysis and provide a clearer understanding of the underlying trends. Subsequently, forecasting models will be developed using the daily data to predict air quality in the region.
+For this study, daily data are considered, followed by aggregation into monthly averages to facilitate a long-term analysis and provide a clearer understanding of the underlying trends. Subsequently, forecasting models will be developed using pure daily data to predict air quality in the region.
 
 ```{r}
 # Pre-requirements
@@ -204,7 +204,7 @@ print_table_custom(
 #  arrange(Pollutant), title = paste(aq_station_names_full[3], "information"))
 ```
 
-However, it is more insightful to focus on the air quality summary tables for the different stations. First, the number of missing values within the selected 10-year daily interval is significant, and these gaps will be addressed through imputation. Additionally, while the selected pollutants generally show a small standard deviation (based on the range between the 1st and 3rd quartiles), some pollutants, such as PM10 and NOx, exhibit maximum values that are considerably higher than the 3rd quartile. 
+More than the stations' details, it is considered more insightful to focus on the air quality summary tables for the different stations. First, the number of missing values within the selected 10-year daily interval is significant, and these gaps must be addressed through imputation to correctly represent the time data. Additionally, while the selected pollutants generally show a small standard deviation (based on the range between the 1st and 3rd quartiles), some pollutants, such as PM10 and NOx, exhibit maximum values that are considerably higher than the 3rd quartile. 
 
 ```{r}
 print_table_custom(
@@ -297,7 +297,7 @@ plot_3_ts(
 )
 ```
 
-When the time series are plotted individually, their patterns become clearer. Each series exhibits variability and is evidently non-stationary, with indications of some seasonal patterns across all stations.
+When the time series are plotted individually, their patterns become clearer. Each series exhibits variability and is apparently non-stationary, with indications of some seasonal patterns across all stations.
 
 ```{r fig.height=8, fig.width=10}
 plot_ts_grid(
@@ -340,7 +340,7 @@ colnames(stats_na_table) <- c(
   "Percentage NAs", "Longest NA gap", "Most frequent gap size"
 )
 rownames(stats_na_table) <- aq_station_names_code
-stats_na_table
+print_table_custom(stats_na_table, title = "Missing values statistics")
 ```
 
 Fortunately, the most frequent gap length is one, and the average gap size is relatively small, likely resulting from occasional sensor malfunctions. This suggests that simple imputation techniques should be reasonably accurate and close to the actual values.
@@ -472,7 +472,7 @@ tmp_ts_s <- NULL
 ```
 
 # Time series data analysis
-In this section data daily data are averaged across the months for performing a long-term analysis. Due to the lower number of observations, now the time series appear more clear. The time series are evidently not stationary however, just by plotting the monthly values, the trend and the seasonal pattern don't emerge much.
+In this section data daily data are averaged across the months for performing a long-term analysis. Due to the lower number of observations, now the time series appear more clear. However, just by plotting the monthly values, the trend and the seasonal pattern don't emerge much.
 
 ```{r}
 agg_df_aq_m <- ARPALData::Time_aggregate(
@@ -558,7 +558,7 @@ The choice of the window size \(p\) is crucial as it directly influences the deg
 - **\(p = 6\):** This value is chosen to remove the seasonal effect identified in the Auto-Correlation Function (ACF), particularly smoothing out variations that span over a half-year period.
 - **\(p = 12\):** A larger window size aimed at providing more significant smoothing, potentially eliminating yearly patterns and offering a clearer view of long-term trends.
 
-In addition, a moving average filter for the seasonal data is tried to estimate the trend, given that the monthly time series exhibits a significant seasonal component.
+In addition, a moving average filter for seasonal data is tried to estimate the trend, given that the monthly time series exhibits a significant seasonal component.
 
 ```{r}
 plot_filtered_ts(
@@ -615,7 +615,7 @@ plot_filtered_ts(
 )
 ```
 
-Overall, the estimated trend appears to be slowly decreasing. These data indicates also that during the COVID-19 restrictions in Italy from 2020 to 2022, the average PM10 levels did not significantly decrease. In fact, there were periods with increased PM10 values, such as at Station 571 in Bormio in 2021. This suggests that sources of particulate emissions unrelated to mobility, such as industrial activities or other local sources, played a substantial role in sustaining PM10 concentrations during this time.
+Overall, the estimated trend appears to be slowly decreasing. These data indicates also that during the COVID-19 restrictions in Italy from 2020 to 2022, the average PM10 levels did not significantly decrease. There were periods with increased PM10 values, such as at Station 571 in Bormio in 2021. This suggests that sources of particulate emissions unrelated to mobility, such as industrial activities or other local sources, played a substantial role in sustaining PM10 concentrations during this time.
 
 To further inspect the behavior of the time series, STL (Seasonal and Trend decomposition using Loess) decomposition is applied. Given the previously observed anomalies, the robust version of the algorithm is used to mitigate their impact. STL also offers flexibility in defining the rate of change for the seasonal component. Since the seasonal pattern appears consistent over time, the seasonal window is set to "periodic" to ensure that the entire dataset is utilized for a comprehensive seasonal analysis.
 
@@ -638,7 +638,7 @@ plot(
 ```
 All stations exhibit a strong seasonal component, with an overall decreasing trend. However, Station 548 shows a notable exception, as it experienced significant peaks in PM10 levels at the end of 2021 and throughout 2022.
 
-The Ljung-Box test supports the validity of the decomposition, as it does not suggest rejecting the null hypothesis that the residuals are white noise for all stations, except for station 571.
+The Ljung-Box test supports the validity of the decompositions, as it does not suggest rejecting the null hypothesis that the residuals are white noise for most stations. However, for station 571, the p-value is notably low, indicating that some adjustments to the parameters in the STL function might be necessary to improve the decomposition accuracy.
 
 ```{r}
 ljung_box_noise_ts_m <- Box.test(stl_ts_m_monthly$time.series[, "remainder"],
@@ -673,11 +673,11 @@ ljung_box_noise <- NULL
 # Models development
 As previously mentioned, this section of the analysis focuses on daily data to develop forecasting models. Given the need to predict future PM10 values for implementing preventive health measures, a short-term analysis is essential.
 
-To simplify visualization and focus on recent data, the time series for this part of the study is limited to the period from January 1, 2022, to December 31, 2023. As shown previously, the choice of selecting a time window at the end of the COVID-19 emergency period in Italy don't influence much the PM10 values pattern
+To simplify visualization and focus on recent data, the time series for this part of the study is limited to the period from January 1, 2022, to December 31, 2023. As shown previously, the choice of a time window at the end of the COVID-19 emergency period in Italy doesn't influence the PM10 values pattern
 
 For an accurate evaluation, it is crucial to avoid using forecast data as training data. Therefore, the time series is divided into training and test sets, with the test period spanning from December 1, 2023, to the end of the period. A one-month test set is selected to assess how the model performs with a relatively long forecast horizon.
 
-## ARIMA models implementation
+## Stochastic models
 ```{r}
 # Train-test split
 start_train <- as.Date("2022-01-01")
@@ -690,31 +690,26 @@ start_test_float <- end_train_float
 train_date_range <- seq(start_train, date_split - 1, by = "day")
 test_date_range <- seq(date_split, end_date, by = "day")
 ```
-
-**Station 548 - Milano v.Senato**
+### Station 548 - Milano v.Senato {.unlisted .unnumbered}
 ```{r}
 ts_m_train <- window(ts_m, start_train_float, end_train_float)
 ts_m_test <- window(ts_m, start_test_float)
-plot_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
-plot_log_arima_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
+tsdisplay(ts_m_train, lag.max = 40, main = paste(aq_station_names_code[1], "-", "original"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
+tsdisplay(log_my(ts_m_train), lag.max = 40, main = paste(aq_station_names_code[1], "-", "logarithmic"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
 ```
 
-Considering the plots can be clearly observed that time series is not stationary. In particular by cheching the ACF plot the lags decay very slow. 
-Also if logarithmic transformation is applied to time series for stabilizing the variance, the situation is more or less invariate.
-The lag is show until 40 lags, because after more than a month of inspection of daily correlation the lags can be not significant.
+The plots indicate that the time series is not stationary, as evidenced by the slow decay of lags in the ACF plot. Even after applying a logarithmic transformation to stabilize the variance, the overall situation remains largely unchanged. The ACF plot displays up to 40 lags since, beyond a month of daily correlations, the lags may become insignificant.
 
 ```{r}
-plot_diff_arima_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40)
-plot_diff_arima_acf_pacf(ts_m_train, aq_station_names_code[1], lag_max = 40, lag = 7)
-plot_diff_arima_acf_pacf(ts_m_train, aq_station_names_code[1], lag = as.integer(daily_ts_freq))
+tsdisplay(diff(ts_m_train), lag.max = 40, main = paste(aq_station_names_code[1], "-", "differenced"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
+tsdisplay(diff(ts_m_train, lag = 7), lag.max = 40, main = paste(aq_station_names_code[1], "-", "differenced by lag 7"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
+tsdisplay(diff(ts_m_train, lag = as.integer(daily_ts_freq)), lag.max = 40, main = paste(aq_station_names_code[1], "-", "differenced by lag 365"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
 ```
 
-Differencing time series instead seems to be very benefician indeed data seems now more alliged to stationary assumption.
-Differencing by lag 7 instead seems to be useless and introduce some forced seasonal pattern to data. 
-TODO: MODIFY Nevertheless, applying differencing to eliminate potential periodic factors might be impractical and risky in the case of daily observations. This is because we are not considering time domains such as months or weeks where a certain type of pattern is expected over a relatively large time period. The difference between days in two different years is highly variable, influenced by factors like weather or the day of the week, making it uninformative and challenging to utilize effectively.
-So difficult to see or predict seasonality
+Differencing the time series appears to be highly effective, as the data now seem better aligned with the stationarity assumption. However, differencing by lag 7 proves unhelpful for improving stationarity and introduces an artificial seasonal pattern into the data. Similarly, differencing by the time series frequency results in the appearance of a seasonal pattern, with sinusoidal oscillations visible in the ACF plot.
+Despite this, applying differencing to remove potential periodic factors in daily observations can be impractical and risky. This approach overlooks time domains like months or weeks, where specific patterns are expected over longer periods. The variability between days across different years—affected by factors such as weather or the day of the week—renders such differencing uninformative and difficult to apply effectively.
 
-Given that the differenced time series ACF plot show some more evident spikes until lag 5 and PACF display relatively fast decay, an ARIMA model with order (0, 1, 5) is fitted. The residuals are checked to ensure they are white noise, and the model is compared with an automatic ARIMA model selection.
+Given that the ACF plot of the differenced time series shows more pronounced spikes up to lag 5 and the PACF exhibits a relatively fast decay, an ARIMA model with order (0, 1, 5) is fitted. The residuals are then examined to confirm they resemble white noise, ensuring the model's adequacy. Finally, this model is compared with an automatically selected ARIMA model to assess its performance.
 
 ```{r}
 ma5_ts_m <- Arima(ts_m_train, order = c(0, 1, 5))
@@ -725,68 +720,62 @@ checkresiduals(ma5_ts_m)
 auto_ts_m <- auto.arima(ts_m_train, ic = "aicc")
 checkresiduals(auto_ts_m)
 ```
+The residuals of the automatically selected ARIMA model appear preferable. The Ljung-Box test yields a higher p-value, and both the residuals plot and ACF suggest that the residuals are closer to white noise.
 
+This procedure is also applied to the other stations. The time series are differenced once to improve stationarity, and the plots are inspected to determine the most suitable ARIMA model for each. In all cases, the models are compared with those selected automatically. While the residuals for both methods generally align with the assumptions, the automatically selected models consistently perform slightly better.
 
-TODO: Describe results
-The same procedure is applied also for the other stations, by differencing one time the time series to make them more stationary and inspecting the plot for guess the best ARIMA model for them.
-In the end also for the others stations are compared with automatic ARIMA model selection. In both cases in the other stations residuals seems to be coherent with the assumptions
-
-**Station 571 - Bormio v.Monte Braulio**
+### Station 571 - Bormio v.Monte Braulio {.unlisted .unnumbered}
 ```{r}
 ts_b_train <- window(ts_b, start_train_float, end_train_float)
 ts_b_test <- window(ts_b, start_test_float)
-plot_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40)
-# plot_log_arima_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40)
+tsdisplay(ts_b_train, lag.max = 40, main = paste(aq_station_names_code[2], "-", "original"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
+# tsdisplay(log_my(ts_b_train), lag.max = 40, main = paste(aq_station_names_code[2], "-", "logarithmic"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
 ```
 ```{r}
-plot_diff_arima_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40)
-# plot_diff_arima_acf_pacf(ts_b_train, aq_station_names_code[2], lag_max = 40, lag = 7)
-# plot_diff_arima_acf_pacf(ts_b_train, aq_station_names_code[2], lag = as.integer(daily_ts_freq))
+tsdisplay(diff(ts_b_train), lag.max = 40, main = paste(aq_station_names_code[2], "-", "differenced"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
+# tsdisplay(diff(ts_b_train, lag = 7), lag.max = 40, main = paste(aq_station_names_code[2], "-", "differenced by lag 7"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
+# tsdisplay(diff(ts_b_train, lag = as.integer(daily_ts_freq)), lag.max = 40, main = paste(aq_station_names_code[2], "-", "differenced by lag 365"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
 ```
+
+For the data from Station 571, more pronounced spikes are observed up to lag 2, along with indications of an autoregressive pattern in the additional spikes. As a result, an ARIMA(1,1,2) model is fitted to capture these characteristics.
+
 ```{r}
 ar1_ma2_ts_b <- Arima(ts_b_train, order = c(1, 1, 2))
-checkresiduals(ar1_ma2_ts_b)
+# checkresiduals(ar1_ma2_ts_b)
 ```
 ```{r}
 auto_ts_b <- auto.arima(ts_b_train, ic = "aicc")
-checkresiduals(auto_ts_b)
+# checkresiduals(auto_ts_b)
 ```
 
-
-**Station 703 - Schivenoglia v. Malpasso**
+### Station 703 - Schivenoglia v. Malpasso {.unlisted .unnumbered}
 ```{r}
 ts_s_train <- window(ts_s, start_train_float, end_train_float)
 ts_s_test <- window(ts_s, start_test_float)
-plot_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40)
-# plot_log_arima_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40)
+tsdisplay(ts_s_train, lag.max = 40, main = paste(aq_station_names_code[3], "-", "original"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
+# tsdisplay(log_my(ts_s_train), lag.max = 40, main = paste(aq_station_names_code[3], "-", "logarithmic"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
 ```
 ```{r}
-plot_diff_arima_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40)
-# plot_diff_arima_acf_pacf(ts_s_train, aq_station_names_code[3], lag_max = 40, lag = 7)
-# plot_diff_arima_acf_pacf(ts_s_train, aq_station_names_code[3], lag = as.integer(daily_ts_freq))
+tsdisplay(diff(ts_s_train), lag.max = 40, main = paste(aq_station_names_code[3], "-", "differenced"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
+# tsdisplay(diff(ts_s_train, lag = 7), lag.max = 40, main = paste(aq_station_names_code[3], "-", "differenced by lag 7"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
+# tsdisplay(diff(ts_s_train, lag = as.integer(daily_ts_freq)), lag.max = 40, main = paste(aq_station_names_code[3], "-", "differenced by lag 365"), ylab = paste("PM10 ", "(", pollutant_units[["PM10"]], ")", sep = ""))
 ```
+The same observation on spikes is applied also to the data of station 703.
+
 ```{r}
 ar1_ma3_ts_s <- Arima(ts_s_train, order = c(1, 1, 3))
-checkresiduals(ar1_ma3_ts_s)
+# checkresiduals(ar1_ma3_ts_s)
 ```
 ```{r}
 auto_ts_s <- auto.arima(ts_s_train, ic = "aicc")
-checkresiduals(auto_ts_s)
+# checkresiduals(auto_ts_s)
 ```
-
-
-In all the stations model fitted using automatic criteria selection have lower value of AICc so these one are selected.
-Notice that the manual selected model in some stations (e.i station 548 and 571) have lower Bic value so they appear better is a more parsimonious model is desidered.
 
 ## Dynamic regression
 
-NO2, N0x and PM10 have the same unit of measure
-CO has a different unit of measure
+This section explores the potential benefits of including other pollutants in predicting PM10. NO₂ is a key precursor in particulate matter formation, as it reacts in the atmosphere to create secondary particles. NOₓ (which includes both NO and NO₂) also significantly contributes to secondary particulate matter, originating mainly from combustion processes like vehicle and industrial emissions. While CO is primarily a gas, it can indirectly affect PM10 levels through atmospheric reactions that produce secondary pollutants, including particulate matter.
 
-Nitrogen Dioxide (NO2): NO2 is a significant precursor to particulate matter formation. It can react in the atmosphere to form secondary particles, contributing to PM10 levels.
-Nitrogen Oxides (NOx): Similar to NO2, NOx (which includes both NO and NO2) plays a crucial role in the formation of secondary particulate matter. These compounds are primarily emitted from combustion processes, such as those in vehicles and industrial facilities, and are directly linked to PM10 concentrations.
-Carbon Monoxide (CO): While CO is primarily a gas, it can contribute indirectly to PM10 levels through its role in atmospheric chemical reactions that lead to the formation of secondary pollutants, including particulate matter.
-Benzene, while a hazardous air pollutant, is less directly related to PM10 formation compared to the other three pollutants.
+Inspecting the relation between NO2 and PM10 is decided, as NO2 appears to be the most relevant predictor. Missing values are imputed as before using linear interpolation.
 
 ```{r}
 no2_ts_m <- xts2ts(xts(df_aq_m$NO2, order.by = df_aq_m$Date), daily_ts_freq)
@@ -820,9 +809,6 @@ no2_ts_s_train <- window(no2_ts_s, start_train_float, end_train_float)
 # nox_ts_b_train <- window(nox_ts_b, start_train_float, end_train_float)
 # nox_ts_s_train <- window(nox_ts_s, start_train_float, end_train_float)
 ```
-
-It seems that between NO2 and PM10 there's a linear relationship. This is confirmed by the linear regression model where the predictor appear strongly significant. 
-The residuals however are clearly violating the white noise assumption. The same procedure is applied to the other stations and the results are very similar.
 ```{r}
 plot_pollutant_XY_lin(
   x = no2_ts_m_train,
@@ -852,8 +838,8 @@ plot_pollutant_XY_lin(
 #  ylab = "PM10"
 # )
 ```
+For Station 548, a linear relationship between NO₂ and PM10 is evident, supported by a linear regression model where the predictor is highly significant. However, the residuals violate the white noise assumption. Similar results are observed at other stations, though for brevity, these are not presented here.
 
-By analyzing the relation between PM10 and CO and PM10 and NOx the situation is similar.
 ```{r}
 # plot_pollutant_XY_lin(
 #  x = co_ts_m_train,
@@ -912,59 +898,68 @@ By analyzing the relation between PM10 and CO and PM10 and NOx the situation is 
 #  ylab = "PM10"
 # )
 ```
+A dynamic regression model is now fitted to the time series data using NO₂ as a predictor. The model is estimated using the `auto.arima` function, which selects the optimal ARIMA model based on the corrected Akaike Information Criterion (AICc). Residuals are then assessed for white noise using the `checkresiduals` function. Results for other stations are not shown for brevity but residuals appear satisfying.
 
-
-It's decided to fit a dynamic regression model to the time series data, considering just NO2 because it seems to be the most related predictor.
-The model is estimated using the auto.arima function, which automatically selects the best ARIMA model based on the corrected Akaike Information Criterion (AICc). The residuals are then checked for white noise using the checkresiduals function.
-
-**Station 548 - Milano v.Senato**
 ```{r}
 xreg_no2_ts_m <- auto.arima(ts_m_train, xreg = no2_ts_m_train, ic = "aicc")
 checkresiduals(xreg_no2_ts_m)
 ```
-**Station 571 - Bormio v.Monte Braulio**
 ```{r}
 xreg_no2_ts_b <- auto.arima(ts_b_train, xreg = no2_ts_b_train, ic = "aicc")
-checkresiduals(xreg_no2_ts_b)
+# checkresiduals(xreg_no2_ts_b)
 ```
-**Station 703 - Schivenoglia v. Malpasso**
 ```{r}
 xreg_no2_ts_s <- auto.arima(ts_s_train, xreg = no2_ts_s_train, ic = "aicc")
-checkresiduals(xreg_no2_ts_s)
+# checkresiduals(xreg_no2_ts_s)
 ```
+
+Residuals are in this case similar to white noise and the Ljung-Box test suggests that there's no evidence for rejecting this hypothesis.
+
+## ARIMA comparison
+```{r}
+ts_m_final_model_list <- list(ma5_ts_m, auto_ts_m, xreg_no2_ts_m)
+ts_b_final_model_list <- list(ar1_ma2_ts_b, auto_ts_b, xreg_no2_ts_b)
+ts_s_final_model_list <- list(ar1_ma3_ts_s, auto_ts_s, xreg_no2_ts_s)
+
+IC_values_ts_m <- compute_arima_IC(arima_models = ts_m_final_model_list, suffixes = list("", "[auto]", "[auto]"))
+IC_values_ts_b <- compute_arima_IC(arima_models = ts_b_final_model_list, suffixes = list("", "[auto]", "[auto]"))
+IC_values_ts_s <- compute_arima_IC(arima_models = ts_s_final_model_list, suffixes = list("", "[auto]", "[auto]"))
+
+print_table_custom(IC_values_ts_m[[1]], title = paste(aq_station_names_code[1], " - ARIMA models IC values"))
+print_table_custom(IC_values_ts_b[[1]], title = paste(aq_station_names_code[2], " - ARIMA models IC values"))
+print_table_custom(IC_values_ts_s[[1]], title = paste(aq_station_names_code[3], " - ARIMA models IC values"))
+```
+
+In all the stations, models that use Nitrogen Dioxide (NO₂) as a predictor exhibit lower AICc values. Additionally, the BIC, which imposes a greater penalty for model complexity, is also lower for these models.
 
 
 ## Non linear models
+A nonlinear model is used to fit the data, specifically a neural network autoregressive model. This model is a feedforward neural network with a single hidden layer, estimated using the `nnetar()` function, which automatically selects the optimal neural network configuration.
+For non-seasonal data, the fitted model is represented as an $NNAR(p,k)$ model, where \( k \) denotes the number of hidden nodes. This model is analogous to an AR(p) model but incorporates nonlinear functions. For seasonal data, the model is denoted as an $NNAR(p,P,k)[m]$, analogous to an $ARIMA(p,0,0)(P,0,0)[m]$ model but with nonlinear components. According to the *Universal Approximation Theorem* ^[G. Cybenko. "Approximation by superpositions of a sigmoidal function". In: Mathematics of Control, Signals and Systems 2 (1989), pp. 303-314], a neural network with a single hidden layer can approximate any continuous function on a compact subset, making it a powerful tool despite its reduced interpretability.
 
-A non linear model is tried to fit the data. The model is a neural network autoregressive model, which is a feedforward neural network with a single hidden layer. The model is estimated using the nnetar function, which automatically selects the best neural network model based on the Akaike Information Criterion (AIC).
-In particular, for non-seasonal data the fitted model is denoted as an $NNAR(p,k)$ model, where k is the number of hidden nodes. This is analogous to an AR(p) model but with nonlinear functions. For seasonal data, the fitted model is called an $NNAR(p,P,k)[m]$ model, which is analogous to an $ARIMA(p,0,0)(P,0,0)[m]$ model but with nonlinear function.
-Due to *Universal Approximation Theorem* ^[G. Cybenko. "Approximation by superpositions of a sigmoidal function". In:
-Mathematics of Control, Signals and Systems 2 (1989), pp. 303-314] a neural network with a single hidden layer can approximate any continuous function on a compact subset.
+For nonlinear models, traditional residual diagnostics using autocorrelation functions may not be sufficient to assess model validity. Therefore, additional types of correlation are examined to ensure a comprehensive evaluation of the model's performance.
 
-For non linear model classical residual checking using autocorrelation function may not be sufficient to assess the model correctness. In this case, other types of correlation are checked.
 ```{r}
 nn_ts_m_auto <- nnetar(ts_m_train)
 plot_nn_residuals(nn_ts_m_auto, aq_station_names_code[1], ts_m_train, lag_max = 40)
 ```
 
-By the ACF plots of residuals and the residual squared seems to be alliged to white noise assumption. Also the Ljung-Box test p-values suggest that there's no wvidence to reject the null hypotesis of white noise.
-The cross correlation function plots instead shows that there are probably some information left because some lags appear to be correlated.
+The ACF plots of the residuals suggest that they align with the white noise assumption. Additionally, the p-values from the Ljung-Box test indicate no significant evidence to reject the null hypothesis of white noise. However, the ACF of the residuals squared and cross-correlation function plots reveal potential remaining information, as some lags appear correlated. This suggests that a more advanced neural network model might be needed. The same procedure applied to other stations yields similar results.
 
-The same procedure is applied to the other stations and the results are very similar to the Milan's station.
 ```{r}
 nn_ts_b_auto <- nnetar(ts_b_train)
-plot_nn_residuals(nn_ts_b_auto, aq_station_names_code[2], ts_b_train, lag_max = 40)
+# plot_nn_residuals(nn_ts_b_auto, aq_station_names_code[2], ts_b_train, lag_max = 40)
 ```
 ```{r}
 nn_ts_s_auto <- nnetar(ts_s_train)
-plot_nn_residuals(nn_ts_s_auto, aq_station_names_code[3], ts_s_train, lag_max = 40)
+# plot_nn_residuals(nn_ts_s_auto, aq_station_names_code[3], ts_s_train, lag_max = 40)
 ```
 
 
 # Forecasting
+This section addresses the forecasting of PM10 levels using various models. An illustrative example of the train-test split for the Milan station data is presented in the plot below. 
 
-An example of train-test split of Milan's station data is shown below.
-If dynamic regression the mean of the observation in the training set for the predictor is used
+For convenience, the forecasting analysis is demonstrated using data from Station 548 in Milan. However, the same methodology can be extended to other stations.
 
 ```{r}
 plot_train_test_ts(ts_m_train, ts_m_test,
@@ -990,41 +985,36 @@ plot_train_test_ts(ts_m_train, ts_m_test,
 # )
 ```
 
+In the dynamic regression approach, the mean of the NO2 predictor observations in the training set is utilized for forecasting new values of PM10.
+
+## Prediction performance
 ```{r}
 largest_horizon <- 31
-ts_m_final_model_list <- list(ma5_ts_m, auto_ts_m, nn_ts_m_auto, xreg_no2_ts_m)
-ts_b_final_model_list <- list(ar1_ma2_ts_b, auto_ts_b, nn_ts_b_auto, xreg_no2_ts_b)
-ts_s_final_model_list <- list(ar1_ma3_ts_s, auto_ts_s, nn_ts_s_auto, xreg_no2_ts_s)
-
-IC_values_ts_m <- compute_arima_IC(arima_models = ts_m_final_model_list[-3], suffixes = list("", "[auto]", "[auto]"))
-IC_values_ts_b <- compute_arima_IC(arima_models = ts_b_final_model_list[-3], suffixes = list("", "[auto]", "[auto]"))
-IC_values_ts_s <- compute_arima_IC(arima_models = ts_s_final_model_list[-3], suffixes = list("", "[auto]", "[auto]"))
-
-print_table_custom(IC_values_ts_m[[1]], title = paste(aq_station_names_code[1], " - ARIMA models IC values"))
-print_table_custom(IC_values_ts_b[[1]], title = paste(aq_station_names_code[2], " - ARIMA models IC values"))
-print_table_custom(IC_values_ts_s[[1]], title = paste(aq_station_names_code[3], " - ARIMA models IC values"))
-```
-
-For conveniance forecast analysis is applied only to Station 548 in Milan but the same procedure can be applied to the other stations.
-```{r}
 # Select the best model in the old order of the list
 best_idx <- IC_values_ts_m[[2]][which.min(IC_values_ts_m[[1]]$AICc)]
 # Best model according to AICc, excluding NN model
-best_arima_ts_m <- ts_m_final_model_list[-3][[best_idx]]
+best_arima_ts_m <- ts_m_final_model_list[[best_idx]]
 plot_forecast(best_arima_ts_m, largest_horizon, ts_m_train, ts_m_test,
   ylab = paste("PM10", pollutant_units[["PM10"]]),
   main = paste("Best ARIMA", "-", aq_station_names_code[1]),
 )
 forecast_residuals_analysis(best_arima_ts_m, largest_horizon, model_name = "Best ARIMA")
 ```
+
+Attempting to forecast future values over a 31-day horizon using the best ARIMA model selected based on the AICc score and the dynamic regression model reveals suboptimal results for longer-term predictions. Although the residuals appear uncorrelated, as indicated by the ACF plots and the Ljung-Box test, which supports the hypothesis of white noise residuals, some issues persist. While the residuals have a mean close to zero, their variability is not constant, and the Q-Q plot shows unsatisfactory behavior in the tails.
+
 ```{r}
 plot_forecast(nn_ts_m_auto, largest_horizon, ts_m_train, ts_m_test,
   ylab = paste("PM10", pollutant_units[["PM10"]]),
   main = paste(nn_ts_m_auto$method, "-", aq_station_names_code[1])
 )
-
 forecast_residuals_analysis(nn_ts_m_auto, largest_horizon)
 ```
+The forecasts generated by the neural network autoregressive model exhibit a distinctly different pattern compared to those produced by the previous model. The residual plot indicates that many values are NA. Despite this, the ACF is highly satisfactory, and the residuals appear to meet the assumptions of normality and a zero mean.
+
+## Forecasts comparison
+A deeper evaluation in terms of forecasting ability is performed, assessing the two implemented methods with other simpler techniques. 
+
 ```{r}
 ts_m_forecast_model_list <- list(
   meanf(ts_m_train, largest_horizon),
@@ -1034,7 +1024,6 @@ ts_m_forecast_model_list <- list(
   best_arima_ts_m,
   nn_ts_m_auto
 )
-
 plot_forecast_multiple_models(ts_m_forecast_model_list,
   largest_horizon,
   ts_m_train,
@@ -1045,6 +1034,11 @@ plot_forecast_multiple_models(ts_m_forecast_model_list,
   skip_n_train_obs = length(ts_m_train) - 1
 )
 ```
+For clearer visualization, the plot below shows only the test set, covering a 31-day forecast horizon. Initially, the drift method, simple exponential smoothing, and Holt's method perform similarly. However, over the long term, their predictions diverge.
+
+The dynamic regression model with the NO₂ predictor initially underestimates values but then predicts accurately before eventually aligning more closely with the simpler methods. In contrast, the neural network-based model exhibits an oscillating behavior.
+
+Tables with various metrics are provided to evaluate the models. Specifically, the models are tested across forecast horizons of 1, 3, 7, 14, and 31 days to assess their performance depending on the desired prediction length. As seen also above, the uncertainty in predictions increases with the length of the forecast horizon. Notably, for models based on daily data, very short-term predictions are particularly crucial.
 
 ```{r}
 table <- get_forecast_metric_table(ts_m_forecast_model_list, 1, ts_m_train, ts_m_test, largest_horizon)
@@ -1062,13 +1056,14 @@ print_table_custom(table, title = paste("Forecast metrics -", aq_station_names_c
 table <- get_forecast_metric_table(ts_m_forecast_model_list, 31, ts_m_train, ts_m_test, largest_horizon)
 print_table_custom(table, title = paste("Forecast metrics -", aq_station_names_code[1], " - 31 days ahead"))
 ```
+For a 1-day ahead forecast, the simplest methods yield the lowest errors, with simple exponential smoothing achieving the best performance. The MASE score confirms that this method outperforms the naive approach. When the forecast window extends to 3 days, the dynamic regression model with ARIMA errors provides the best results, although simpler methods still perform reasonably well. As the forecast horizon increases beyond 7-14 days, prediction accuracy generally declines due to growing uncertainty and the challenges of capturing long-term trends. In these longer-term scenarios, the average method tends to perform better because it is less sensitive to short-term fluctuations.
 
 
 # Conclusions
 
-For modelling daily data probably are needed some more advanced models
-or model them with model the seasonality using Fourier terms ^[https://robjhyndman.com/hyndsight/longseasonality/]
-```{r}
-# Discussion and further perspectives.
-# The discussion section should recall the main results and point to new research questions, that appeared from your work, or possible limitations.
-```
+Summarizing, this analysis highlights various aspects of the data related to air pollution in Lombardia, Italy, even if meteorological knowledge is not considered.
+Through exploratory data analysis on the monthly data, it was observed that rural areas may be affected by higher PM10 values more than other zones in some periods, and in general, Particulate Matter presents a strong seasonality. The global trend of this pollutant on the analyzed stations seems decreasing and during the emergency period in Italy due to COVID-19 PM10 values have not reduced much. Within the selected date range also the mean value of the pollutant among the zones didn't exceed the annual threshold so in general situation doesn't appear to be alarming.
+
+In terms of forecasting daily data for station 548 in Milano v.Senato, the implemented models seem to not bring much improvement over the simplest methods, even if the white noise assumption for the residuals is satisfied. In particular the specified neural network autoregressive model seems to be not appropriate, considering the scores obtained on the test set. Using external predictors instead appears to be beneficial.
+
+In conclusion, handling daily data likely requires more advanced models to better capture the underlying patterns. In addition, to effectively account for the seasonality which was not fully addressed in this study due to its complexity, incorporating Fourier terms could be a promising approach for improving the accuracy of forecasts^[https://robjhyndman.com/hyndsight/longseasonality/].

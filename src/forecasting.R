@@ -68,7 +68,9 @@ forecast_residuals_analysis <- function(model, h, model_name = NULL, xreg_method
         y_hat <- forecast(model, h = h)
     }
 
-    model_name <- get_model_name(model)
+    if (is.null(model_name)) {
+        model_name <- get_model_name(model)
+    }
 
     res <- y_hat$residuals
     mres <- mean(res, na.rm = TRUE)
@@ -207,7 +209,7 @@ plot_forecast_multiple_models <- function(model_list, h, ts_train, ts_test, ylab
 
     for (i in 1:length(model_list)) {
         y_hat <- preds[[i]]
-        lines(y_hat, col = colors[i], lwd = 2)
+        lines(y_hat, col = colors[i], lwd = 2, lty = 5)
     }
 
     legend(
