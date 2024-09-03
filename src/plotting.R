@@ -203,9 +203,9 @@ plot_nn_residuals <- function(nn_model, model_name, ts, lag_max = NULL) {
 
   layout_matrix <- matrix(c(1, 2, 3, 3), nrow = 2, ncol = 2, byrow = TRUE)
   layout(layout_matrix)
-  Ccf(ts, r, main = paste(model_name, "residuals - time series"), lag.max = lag_max)
-  Ccf(ts^2, r, main = paste(model_name, "residuals - time series^2"), lag.max = lag_max)
-  Ccf(r * ts^2, r, main = paste(model_name, "residuals - residuals*time series^2"), lag.max = lag_max)
+  Ccf(ts, r, main = paste(model_name, "- residuals and time series"), lag.max = lag_max)
+  Ccf(ts^2, r, main = paste(model_name, "- residuals and time series^2"), lag.max = lag_max)
+  Ccf(r * ts^2, r, main = paste(model_name, "- residuals and residuals*time series^2"), lag.max = lag_max)
   par(mfrow = c(1, 1))
 }
 
