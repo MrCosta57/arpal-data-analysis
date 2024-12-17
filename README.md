@@ -1,5 +1,8 @@
 # Assessing Air Quality in Lombardia, Italy through Time Series Analysis: Implications for Public Health and Policy
 
+<div style="text-align: center;">
+    <img src="assets/air_quality_cover_landscape.jpeg" alt="repo_cover" style="width:70%">
+</div>
 
 ## Description
 This project aims to evaluate the air quality in Lombardia, Italy, using a comprehensive time series analysis. The data for this study will be derived from sensors located at various stations across the region, which can be accessed via the regional website.

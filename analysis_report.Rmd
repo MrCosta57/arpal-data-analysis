@@ -1,9 +1,8 @@
 ---
-title: "Assessing Air Quality in Lombardia, Italy through Time Series Analysis: Implications for Public Health and Policy"
-subtitle: "Time Series Analysis project"
+title: 'Assessing Air Quality in Lombardia, Italy through Time Series Analysis: Implications
+  for Public Health and Policy'
 author: "Giovanni Costa - 880892"
 date: "AY 2023/24"
-geometry: "left=1cm,right=2cm,top=1cm,bottom=1cm"
 output:
   html_document:
     toc: true
@@ -11,10 +10,15 @@ output:
     toc_depth: 2
     toc_float:
       smooth_scroll: false
-    fig_caption: yes
+    fig_caption: true
     theme: flatly
     highlight: pygments
-    css: "assets/css/styles.css"
+    css: assets/css/styles.css
+  pdf_document:
+    toc: true
+    toc_depth: '2'
+geometry: left=1cm,right=2cm,top=1cm,bottom=1cm
+subtitle: Time Series Analysis project
 editor_options:
   chunk_output_type: console
 ---
@@ -44,11 +48,11 @@ Considering the data provided by the region, the following pollutants will be an
 
 - **Benzene** is a volatile organic compound (VOC) commonly used in the production of plastics, resins, and synthetic fibers, as well as in gasoline. It is released into the air through emissions from motor vehicles, industrial processes, and the evaporation of benzene-containing products. Exposure to benzene primarily occurs through inhalation and can lead to serious health effects, including bone marrow damage, which can cause blood disorders such as anemia and increase the risk of leukemia, a type of cancer.
 - **Carbon Monoxide (CO)** is a colorless, odorless gas produced by incomplete combustion of carbon-containing fuels, such as gasoline, natural gas, oil, and wood. Major sources include motor vehicles, industrial processes, and residential heating systems. CO interferes with the body's ability to transport oxygen by binding to hemoglobin in the blood, forming carboxyhemoglobin. High levels of exposure can lead to symptoms such as headaches, dizziness, and even death due to oxygen deprivation.
-- **Nitrogen Dioxide (NO₂)** is a reddish-brown gas with a sharp, biting odor. It is a significant air pollutant formed primarily from the combustion of fossil fuels in vehicles, power plants, and industrial processes. NO₂ can irritate the respiratory system, exacerbate asthma, and reduce lung function. It also contributes to the formation of ground-level ozone and fine particulate matter, which can have further adverse effects on human health and the environment.
-- **Nitrogen Oxides (NOₓ)** encompass a group of gases, including nitrogen dioxide (NO₂) and nitrogen monoxide (NO), produced during combustion processes, particularly at high temperatures. Major sources include motor vehicles, power plants, and industrial facilities. NOₓ gases can cause respiratory problems, contribute to the formation of smog and acid rain, and lead to the secondary formation of fine particulate matter (PM2.5), all of which can have severe health and environmental impacts.
+- **Nitrogen Dioxide ($NO_2$)** is a reddish-brown gas with a sharp, biting odor. It is a significant air pollutant formed primarily from the combustion of fossil fuels in vehicles, power plants, and industrial processes. $NO_2$ can irritate the respiratory system, exacerbate asthma, and reduce lung function. It also contributes to the formation of ground-level ozone and fine particulate matter, which can have further adverse effects on human health and the environment.
+- **Nitrogen Oxides ($NO_2$)** encompass a group of gases, including nitrogen dioxide ($NO_2$) and nitrogen monoxide (NO), produced during combustion processes, particularly at high temperatures. Major sources include motor vehicles, power plants, and industrial facilities. $NO_x$ gases can cause respiratory problems, contribute to the formation of smog and acid rain, and lead to the secondary formation of fine particulate matter (PM2.5), all of which can have severe health and environmental impacts.
 - **Particulate Matter 10 (PM10)** refers to airborne particles with a diameter of 10 micrometers or less. These particles can originate from a variety of sources, including construction sites, road dust, industrial emissions, and combustion processes. PM10 can be inhaled into the respiratory system, leading to health issues such as respiratory infections, lung inflammation, and aggravation of existing heart and lung diseases. Long-term exposure can decrease lung function and increase mortality from cardiovascular and respiratory diseases.
 
-In particular, PM10 is selected for the main part of this analysis because it serves as a comprehensive indicator of particulate pollution from a wide range of sources, such as traffic emissions, industrial processes, and the secondary formation of particles from gaseous pollutants. Its direct link to adverse health effects, including respiratory and cardiovascular diseases, makes PM10 a crucial measure of air quality. Additionally, other pollutants like Benzene, CO, NO₂, and NOₓ can contribute to PM10 levels through both primary emissions and secondary reactions, making them valuable predictor variables for analyzing fluctuations in PM10 concentrations.
+In particular, PM10 is selected for the main part of this analysis because it serves as a comprehensive indicator of particulate pollution from a wide range of sources, such as traffic emissions, industrial processes, and the secondary formation of particles from gaseous pollutants. Its direct link to adverse health effects, including respiratory and cardiovascular diseases, makes PM10 a crucial measure of air quality. Additionally, other pollutants like Benzene, CO, $NO_2$, and $NO_x$ can contribute to PM10 levels through both primary emissions and secondary reactions, making them valuable predictor variables for analyzing fluctuations in PM10 concentrations.
 
 For this study, daily data are considered, followed by aggregation into monthly averages to facilitate a long-term analysis and provide a clearer understanding of the underlying trends. Subsequently, forecasting models will be developed using pure daily data to predict air quality in the region.
 
@@ -773,7 +777,7 @@ auto_ts_s <- auto.arima(ts_s_train, ic = "aicc")
 
 ## Dynamic regression
 
-This section explores the potential benefits of including other pollutants in predicting PM10. NO₂ is a key precursor in particulate matter formation, as it reacts in the atmosphere to create secondary particles. NOₓ (which includes both NO and NO₂) also significantly contributes to secondary particulate matter, originating mainly from combustion processes like vehicle and industrial emissions. While CO is primarily a gas, it can indirectly affect PM10 levels through atmospheric reactions that produce secondary pollutants, including particulate matter.
+This section explores the potential benefits of including other pollutants in predicting PM10. $NO_2$ is a key precursor in particulate matter formation, as it reacts in the atmosphere to create secondary particles. $NO_x$ (which includes both NO and $NO_2$) also significantly contributes to secondary particulate matter, originating mainly from combustion processes like vehicle and industrial emissions. While CO is primarily a gas, it can indirectly affect PM10 levels through atmospheric reactions that produce secondary pollutants, including particulate matter.
 
 Inspecting the relation between NO2 and PM10 is decided, as NO2 appears to be the most relevant predictor. Missing values are imputed as before using linear interpolation.
 
@@ -838,7 +842,7 @@ plot_pollutant_XY_lin(
 #  ylab = "PM10"
 # )
 ```
-For Station 548, a linear relationship between NO₂ and PM10 is evident, supported by a linear regression model where the predictor is highly significant. However, the residuals violate the white noise assumption. Similar results are observed at other stations, though for brevity, these are not presented here.
+For Station 548, a linear relationship between $NO_2$ and PM10 is evident, supported by a linear regression model where the predictor is highly significant. However, the residuals violate the white noise assumption. Similar results are observed at other stations, though for brevity, these are not presented here.
 
 ```{r}
 # plot_pollutant_XY_lin(
@@ -898,7 +902,7 @@ For Station 548, a linear relationship between NO₂ and PM10 is evident, suppor
 #  ylab = "PM10"
 # )
 ```
-A dynamic regression model is now fitted to the time series data using NO₂ as a predictor. The model is estimated using the `auto.arima` function, which selects the optimal ARIMA model based on the corrected Akaike Information Criterion (AICc). Residuals are then assessed for white noise using the `checkresiduals` function. Results for other stations are not shown for brevity but residuals appear satisfying.
+A dynamic regression model is now fitted to the time series data using $NO_2$ as a predictor. The model is estimated using the `auto.arima` function, which selects the optimal ARIMA model based on the corrected Akaike Information Criterion (AICc). Residuals are then assessed for white noise using the `checkresiduals` function. Results for other stations are not shown for brevity but residuals appear satisfying.
 
 ```{r}
 xreg_no2_ts_m <- auto.arima(ts_m_train, xreg = no2_ts_m_train, ic = "aicc")
@@ -930,7 +934,7 @@ print_table_custom(IC_values_ts_b[[1]], title = paste(aq_station_names_code[2], 
 print_table_custom(IC_values_ts_s[[1]], title = paste(aq_station_names_code[3], " - ARIMA models IC values"))
 ```
 
-In all the stations, models that use Nitrogen Dioxide (NO₂) as a predictor exhibit lower AICc values. Additionally, the BIC, which imposes a greater penalty for model complexity, is also lower for these models.
+In all the stations, models that use Nitrogen Dioxide ($NO_2$) as a predictor exhibit lower AICc values. Additionally, the BIC, which imposes a greater penalty for model complexity, is also lower for these models.
 
 
 ## Non linear models
@@ -1036,7 +1040,7 @@ plot_forecast_multiple_models(ts_m_forecast_model_list,
 ```
 For clearer visualization, the plot below shows only the test set, covering a 31-day forecast horizon. Initially, the drift method, simple exponential smoothing, and Holt's method perform similarly. However, over the long term, their predictions diverge.
 
-The dynamic regression model with the NO₂ predictor initially underestimates values but then predicts accurately before eventually aligning more closely with the simpler methods. In contrast, the neural network-based model exhibits an oscillating behavior.
+The dynamic regression model with the $NO_2$ predictor initially underestimates values but then predicts accurately before eventually aligning more closely with the simpler methods. In contrast, the neural network-based model exhibits an oscillating behavior.
 
 Tables with various metrics are provided to evaluate the models. Specifically, the models are tested across forecast horizons of 1, 3, 7, 14, and 31 days to assess their performance depending on the desired prediction length. As seen also above, the uncertainty in predictions increases with the length of the forecast horizon. Notably, for models based on daily data, very short-term predictions are particularly crucial.
 
