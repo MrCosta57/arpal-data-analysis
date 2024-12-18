@@ -1,6 +1,6 @@
 # Assessing Air Quality in Lombardia, Italy through Time Series Analysis: Implications for Public Health and Policy
 
-<div style="text-align: center;">
+<div align="center">
     <img src="assets/air_quality_cover_landscape.jpeg" alt="repo_cover" style="width:70%">
 </div>
 
